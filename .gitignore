@@ -24,6 +24,9 @@ coverage.xml
 # uv
 # uv.lock is tracked — do not ignore it
 
+# Private planning documents (never publish)
+.private/
+
 # Docs
 site/
 
