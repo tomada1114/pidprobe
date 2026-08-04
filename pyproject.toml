@@ -4,10 +4,10 @@ build-backend = "hatchling.build"
 
 [project]
 name = "pidprobe"
-version = "0.1.0"
+version = "0.0.1"
 description = "Structured JSON snapshots of running CPython 3.14+ processes via PEP 768 - no agent, no restart, no gdb"
 readme = "README.md"
-requires-python = ">=3.12"
+requires-python = ">=3.14"
 license = "MIT"
 license-files = ["LICENSE"]
 authors = [{ name = "tomada", email = "tmasuyama1114@gmail.com" }]
@@ -16,9 +16,8 @@ classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.12",
-    "Programming Language :: Python :: 3.13",
     "Programming Language :: Python :: 3.14",
+    "Programming Language :: Python :: 3.15",
     "Typing :: Typed",
 ]
 
@@ -52,7 +51,7 @@ packages = ["src/pidprobe"]
 # --------------------------------------------------------------------------- #
 
 [tool.ruff]
-target-version = "py312"
+target-version = "py314"
 line-length = 88
 src = ["src", "tests", "scripts"]
 
@@ -142,7 +141,7 @@ indent-style = "space"
 # --------------------------------------------------------------------------- #
 
 [tool.mypy]
-python_version = "3.12"
+python_version = "3.14"
 strict = true
 warn_return_any = true
 warn_unused_configs = true
@@ -170,6 +169,7 @@ addopts = [
 ]
 markers = [
     "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    "integration: tests that attach to a real child process via sys.remote_exec",
 ]
 
 # --------------------------------------------------------------------------- #

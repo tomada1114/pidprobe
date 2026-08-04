@@ -21,7 +21,7 @@ jobs:
       - uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990 # v8.3.2
         with:
           enable-cache: true
-          python-version: "3.12"
+          python-version: "3.14"
 
       - name: Export requirements
         run: uv export --no-emit-project --format requirements-txt > requirements.txt
