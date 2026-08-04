@@ -1,6 +1,6 @@
 # pidprobe
 
-A short description of what this library does.
+Structured JSON snapshots of running CPython 3.14+ processes via PEP 768 - no agent, no restart, no gdb
 
 ## Installation
 
