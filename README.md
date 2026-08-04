@@ -1,23 +1,23 @@
-# my-package
+# pidprobe
 
-[![CI](https://github.com/your-username/my-package/actions/workflows/ci.yml/badge.svg)](https://github.com/your-username/my-package/actions/workflows/ci.yml)
-[![codecov](https://codecov.io/gh/your-username/my-package/branch/main/graph/badge.svg)](https://codecov.io/gh/your-username/my-package)
-[![PyPI](https://img.shields.io/pypi/v/my-package)](https://pypi.org/project/my-package/)
-[![Python](https://img.shields.io/pypi/pyversions/my-package)](https://pypi.org/project/my-package/)
+[![CI](https://github.com/tomada1114/pidprobe/actions/workflows/ci.yml/badge.svg)](https://github.com/tomada1114/pidprobe/actions/workflows/ci.yml)
+[![codecov](https://codecov.io/gh/tomada1114/pidprobe/branch/main/graph/badge.svg)](https://codecov.io/gh/tomada1114/pidprobe)
+[![PyPI](https://img.shields.io/pypi/v/pidprobe)](https://pypi.org/project/pidprobe/)
+[![Python](https://img.shields.io/pypi/pyversions/pidprobe)](https://pypi.org/project/pidprobe/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-A short description of what this library does.
+Structured JSON snapshots of running CPython 3.14+ processes via PEP 768 - no agent, no restart, no gdb
 
 ## Quickstart
 
 ```bash
-pip install my-package
+pip install pidprobe
 # or
-uv add my-package
+uv add pidprobe
 ```
 
 ```python
-from my_package import add
+from pidprobe import add
 
 result = add(1, 2)  # 3
 ```
@@ -71,40 +71,6 @@ stay behind human approval.
 test-for-the-sake-of-testing. Branch coverage is enabled, so conditional logic
 is meaningfully tested.
 
-## Using This Template
-
-1. Click **"Use this template"** on GitHub (or clone and remove `.git`)
-2. Run `scripts/bootstrap.py` to rename the package and replace placeholders:
-
-   ```bash
-   uv run python scripts/bootstrap.py my-cool-lib \
-     --author "Jane Doe" --email jane@example.com --github-user janedoe
-   uv lock
-   ```
-
-   This renames `src/my_package` to `src/my_cool_lib` and replaces
-   `my-package`, `my_package`, `your-username`, `Your Name`, and
-   `you@example.com` across all tracked files (`uv.lock` is skipped —
-   run `uv lock` afterward to regenerate it). `--author`, `--email`, and
-   `--github-user` are optional; any omitted placeholder is left as-is.
-3. Update `pyproject.toml` metadata (description, URLs) beyond what the
-   script covers
-4. Update `README.md`, `SECURITY.md`, and `CLAUDE.md`
-5. Replace the placeholder implementation and keep `src/<your_package>/__init__.py`,
-   `docs/reference.md`, and the usage examples in sync with your public API
-6. Create a `CODECOV_TOKEN` repository secret (from [codecov.io](https://codecov.io))
-   so the CI coverage upload step can authenticate
-7. Note: the [OpenSSF Scorecard](https://github.com/ossf/scorecard) workflow
-   (`.github/workflows/scorecard.yml`) only runs successfully on public
-   repositories; it will fail on private repos
-
-To find any placeholders the script left untouched (e.g. because an
-optional argument was omitted):
-
-```bash
-rg -n "your-username|my-package|my_package|Your Name|you@example" .
-```
-
 ## Development
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for full setup instructions.
@@ -126,8 +92,8 @@ confirm the distribution imports from the wheel, not from `src/`.
 
 ## Documentation
 
-- [Getting Started](https://your-username.github.io/my-package/getting-started/)
-- [API Reference](https://your-username.github.io/my-package/reference/)
+- [Getting Started](https://tomada1114.github.io/pidprobe/getting-started/)
+- [API Reference](https://tomada1114.github.io/pidprobe/reference/)
 
 ## License
 
