@@ -15,9 +15,14 @@ from typing import TYPE_CHECKING, Any
 from ._channel import DEFAULT_TIMEOUT_SECONDS
 from ._errors import ProbeError
 from ._snapshot import take_snapshot
+from .collectors import BUILTIN_COLLECTORS
+from .collectors._stacks import build_stacks_collector
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Sequence
+
+    from .collectors import Collector
+
 
 EXIT_OK = 0
 """Exit code for a snapshot that was collected and printed."""
@@ -73,9 +78,29 @@ def _write_json(document: dict[str, Any], *, is_pretty: bool) -> None:
     sys.stdout.write(f"{text}\n")
 
 
+def _snap_collectors(*, is_masked: bool) -> tuple[Collector, ...] | None:
+    """Return the collectors ``snap`` runs, or ``None`` for the defaults.
+
+    Masking is baked into the stacks collector's generated source, so turning
+    it off means swapping that one collector for an unmasked build and leaving
+    every other collector exactly as it is.
+    """
+    if is_masked:
+        return None
+    unmasked = build_stacks_collector(is_masked=False)
+    return tuple(
+        unmasked if collector.name == unmasked.name else collector
+        for collector in BUILTIN_COLLECTORS
+    )
+
+
 def _run_snap(args: argparse.Namespace) -> int:
     """Take one snapshot and print it."""
-    snapshot = take_snapshot(args.pid, timeout_seconds=args.timeout)
+    snapshot = take_snapshot(
+        args.pid,
+        timeout_seconds=args.timeout,
+        collectors=_snap_collectors(is_masked=args.is_masked),
+    )
     _write_json(snapshot, is_pretty=args.pretty)
     return EXIT_OK
 
@@ -124,6 +149,15 @@ def build_parser() -> argparse.ArgumentParser:
         metavar="SECONDS",
         help=(
             f"hard budget for the whole probe (default: {DEFAULT_TIMEOUT_SECONDS:g})"
+        ),
+    )
+    snap.add_argument(
+        "--no-mask",
+        dest="is_masked",
+        action="store_false",
+        help=(
+            "show credential-like locals instead of masking them; masking is "
+            "on by default and happens inside the target process"
         ),
     )
     snap.set_defaults(handler=_run_snap)

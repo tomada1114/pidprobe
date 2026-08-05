@@ -13,6 +13,8 @@ from pidprobe import __version__
 from pidprobe import cli as cli_module
 from pidprobe._errors import ProbeTimeoutError
 from pidprobe.cli import EXIT_OK, EXIT_PROBE_ERROR, build_parser, main
+from pidprobe.collectors import BUILTIN_COLLECTORS, STACKS_COLLECTOR
+from pidprobe.collectors._stacks import build_stacks_collector
 
 SNAPSHOT = {"schema_version": "1.0", "meta": {"pid": 4321}, "gc": {"enabled": True}}
 
@@ -68,6 +70,31 @@ class TestSnapOutput:
         main(["snap", "4321", "--timeout", "0.5"])
         assert fake_snapshot["pid"] == 4321
         assert fake_snapshot["timeout_seconds"] == pytest.approx(0.5)
+
+
+class TestSnapMasking:
+    def test_masking_is_on_by_default(self, fake_snapshot):
+        main(["snap", "4321"])
+
+        # None lets take_snapshot pick the built-in collectors, whose stacks
+        # collector masks credentials.
+        assert fake_snapshot["collectors"] is None
+
+    def test_no_mask_swaps_in_an_unmasked_stacks_collector(self, fake_snapshot):
+        main(["snap", "4321", "--no-mask"])
+
+        collectors = fake_snapshot["collectors"]
+        assert [collector.name for collector in collectors] == [
+            collector.name for collector in BUILTIN_COLLECTORS
+        ]
+        assert STACKS_COLLECTOR not in collectors
+        by_name = {collector.name: collector for collector in collectors}
+        assert by_name["stacks"] == build_stacks_collector(is_masked=False)
+
+    def test_parser_defaults_to_masking(self):
+        args = build_parser().parse_args(["snap", "4321"])
+
+        assert args.is_masked is True
 
 
 class TestErrorHandling:

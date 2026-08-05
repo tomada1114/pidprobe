@@ -21,10 +21,12 @@ from pidprobe.collectors import (
     Collector,
     compose_collector_source,
 )
+from pidprobe.collectors._stacks import build_stacks_collector
 
 from .conftest import run_collector_source
 
 MARKER = "pidprobe-collector-marker"
+CREDENTIAL = "swordfish"
 
 
 def collect(*collectors: Collector) -> dict[str, Any]:
@@ -32,6 +34,16 @@ def collect(*collectors: Collector) -> dict[str, Any]:
     payload = run_collector_source(compose_collector_source(collectors))
     sections: dict[str, Any] = payload["sections"]
     return sections
+
+
+def reported_locals(sections: dict[str, Any], name: str) -> list[str]:
+    """Return every rendering of the local *name* across all reported frames."""
+    return [
+        frame["locals"][name]
+        for thread in sections["stacks"]["threads"]
+        for frame in thread["frames"]
+        if frame["locals"] and name in frame["locals"]
+    ]
 
 
 class TestCollectorDefinition:
@@ -160,12 +172,7 @@ class TestStacksCollector:
 
         sections = collect(STACKS_COLLECTOR)
 
-        reported = [
-            frame["locals"]["long_value"]
-            for thread in sections["stacks"]["threads"]
-            for frame in thread["frames"]
-            if frame["locals"] and "long_value" in frame["locals"]
-        ]
+        reported = reported_locals(sections, "long_value")
         assert reported
         assert all(text.endswith("...<truncated>") for text in reported)
         assert all(len(text) < 1_000 for text in reported)
@@ -180,13 +187,48 @@ class TestStacksCollector:
 
         sections = collect(STACKS_COLLECTOR)
 
-        reported = [
-            frame["locals"]["exploding"]
-            for thread in sections["stacks"]["threads"]
-            for frame in thread["frames"]
-            if frame["locals"] and "exploding" in frame["locals"]
+        assert reported_locals(sections, "exploding") == [
+            "<unrepresentable Exploding: ValueError>",
         ]
-        assert reported == ["<unrepresentable Exploding: ValueError>"]
+
+    def test_deeply_nested_locals_are_rendered_within_the_safe_repr_bounds(self):
+        nested = [[[["deep"]]]]  # noqa: F841 -- read back out of this frame's locals
+
+        sections = collect(STACKS_COLLECTOR)
+
+        assert reported_locals(sections, "nested") == ["[[[[...]]]]"]
+
+
+class TestStacksMasking:
+    def test_credential_like_locals_are_masked_by_default(self):
+        password = CREDENTIAL  # noqa: F841 -- read back out of this frame's locals
+
+        sections = collect(STACKS_COLLECTOR)
+
+        assert sections["stacks"]["masking_enabled"] is True
+        assert reported_locals(sections, "password") == ["<masked>"]
+
+    def test_credentials_inside_a_local_mapping_are_masked_too(self):
+        client_config = {"api_key": CREDENTIAL}  # noqa: F841 -- read back out later
+
+        sections = collect(STACKS_COLLECTOR)
+
+        assert reported_locals(sections, "client_config") == [
+            "{'api_key': <masked>}",
+        ]
+
+    def test_unmasked_build_reports_the_raw_value(self):
+        password = CREDENTIAL  # noqa: F841 -- read back out of this frame's locals
+
+        sections = collect(build_stacks_collector(is_masked=False))
+
+        assert sections["stacks"]["masking_enabled"] is False
+        assert reported_locals(sections, "password") == [repr(CREDENTIAL)]
+
+    def test_ordinary_locals_are_untouched_by_masking(self):
+        sections = collect(STACKS_COLLECTOR)
+
+        assert reported_locals(sections, "self")
 
 
 class TestObjectsCollector:
