@@ -59,6 +59,7 @@ markdown_extensions:
 nav:
   - Home: index.md
   - Getting Started: getting-started.md
+  - Demo: demo.md
   - API Reference: reference.md
   - Output Schema: output-schema.md
   - Collector Plugins: plugins.md

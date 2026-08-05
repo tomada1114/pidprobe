@@ -50,6 +50,7 @@ for thread in snapshot["stacks"]["threads"]:
 
 ## What's Next?
 
+- [Demo](demo.md) — a broken FastAPI app in Docker, to try all of this on
 - [API Reference](reference.md) — every command, option and exit code
 - [Output Schema](output-schema.md) — what the JSON contains, field by field
 - [Collector Plugins](plugins.md) — add a section of your own

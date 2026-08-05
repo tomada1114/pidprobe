@@ -122,6 +122,31 @@ for delta in iter_snapshot_deltas(12345, interval_seconds=5, count=3):
     print(delta["objects"]["types"][:3])
 ```
 
+## Try it without breaking your own app
+
+`demo/` is a FastAPI + SQLAlchemy application that deadlocks and leaks on
+request, in a Docker image that already has pidprobe installed beside it:
+
+```bash
+docker build -t pidprobe-demo -f demo/Dockerfile .
+docker run --rm -d --name pidprobe-demo -p 8000:8000 --cap-add=SYS_PTRACE pidprobe-demo
+
+curl -s -X POST localhost:8000/deadlock     # arm the lock-order inversion
+curl -s --max-time 5 localhost:8000/reports/daily   # this never comes back
+
+docker exec pidprobe-demo pidprobe snap 1 \
+    | jq -c '.stacks.threads[] | select(.frames[0].file | endswith("app.py"))
+             | {thread: .name, stuck_at: "\(.frames[0].function):\(.frames[0].line)"}'
+```
+
+```json
+{"thread":"ledger-writer","stuck_at":"_ledger_writer:96"}
+{"thread":"AnyIO worker thread","stuck_at":"read_report:180"}
+```
+
+The [demo walkthrough](https://tomada1114.github.io/pidprobe/demo/) covers the
+leak and `diff`, `doctor` and the SQLAlchemy pool section as well.
+
 ## Exit codes
 
 A failing probe is something a script has to react to, so the reason is in the
@@ -294,6 +319,7 @@ confirm the distribution imports from the wheel, not from `src/`.
 ## Documentation
 
 - [Getting Started](https://tomada1114.github.io/pidprobe/getting-started/)
+- [Demo](https://tomada1114.github.io/pidprobe/demo/)
 - [API Reference](https://tomada1114.github.io/pidprobe/reference/)
 
 ## License
