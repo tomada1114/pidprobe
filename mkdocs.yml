@@ -60,4 +60,5 @@ nav:
   - Home: index.md
   - Getting Started: getting-started.md
   - API Reference: reference.md
+  - Collector Plugins: plugins.md
   - Contributing: contributing.md
