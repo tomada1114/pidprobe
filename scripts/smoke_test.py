@@ -59,20 +59,41 @@ for import_name in sorted(import_names):
 """
 
 
-def _load_project_name(pyproject_path: Path) -> str:
-    """Return the normalized distribution name from pyproject metadata."""
+def _load_project(pyproject_path: Path) -> dict[str, object]:
+    """Return the ``[project]`` table from pyproject metadata."""
     pyproject = tomllib.loads(pyproject_path.read_text(encoding="utf-8"))
     project = pyproject.get("project")
     if not isinstance(project, dict):
         msg = "pyproject.toml is missing a [project] table."
         raise SystemExit(msg)
 
+    return project
+
+
+def _project_name(project: dict[str, object]) -> str:
+    """Return the distribution name declared in pyproject metadata."""
     project_name = project.get("name")
     if not isinstance(project_name, str) or not project_name:
         msg = "pyproject.toml must define a non-empty project.name value."
         raise SystemExit(msg)
 
     return project_name
+
+
+def _console_scripts(project: dict[str, object]) -> list[str]:
+    """Return the console script names the distribution declares.
+
+    These are what a user actually types after ``pip install``, and they only
+    exist if the entry point resolves — so running each one is the cheapest
+    proof that the wheel installs a working command and not just an
+    importable package.
+    """
+    scripts = project.get("scripts", {})
+    if not isinstance(scripts, dict):
+        msg = "pyproject.toml [project.scripts] must be a table."
+        raise SystemExit(msg)
+
+    return sorted(str(name) for name in scripts)
 
 
 def _resolve_wheel_path(arguments: list[str]) -> Path:
@@ -96,11 +117,16 @@ def _resolve_wheel_path(arguments: list[str]) -> Path:
     return wheel_paths[0].resolve()
 
 
+def _venv_executable(venv_dir: Path, name: str) -> Path:
+    """Return the path of an executable installed into the temporary venv."""
+    if sys.platform == "win32":
+        return venv_dir / "Scripts" / f"{name}.exe"
+    return venv_dir / "bin" / name
+
+
 def _venv_python(venv_dir: Path) -> Path:
     """Return the Python executable path for the temporary virtual environment."""
-    if sys.platform == "win32":
-        return venv_dir / "Scripts" / "python.exe"
-    return venv_dir / "bin" / "python"
+    return _venv_executable(venv_dir, "python")
 
 
 def _run(command: list[str]) -> None:
@@ -110,8 +136,10 @@ def _run(command: list[str]) -> None:
 
 
 def main(arguments: list[str]) -> int:
-    """Install the built wheel into a temp environment and verify imports."""
-    project_name = _load_project_name(REPO_ROOT / "pyproject.toml")
+    """Install the built wheel into a temp environment and verify it works."""
+    project = _load_project(REPO_ROOT / "pyproject.toml")
+    project_name = _project_name(project)
+    console_scripts = _console_scripts(project)
     wheel_path = _resolve_wheel_path(arguments)
 
     with tempfile.TemporaryDirectory(prefix="wheel-smoke-test-") as temp_dir:
@@ -139,6 +167,13 @@ def main(arguments: list[str]) -> int:
                 str(REPO_ROOT),
             ]
         )
+
+        for script_name in console_scripts:
+            script_path = _venv_executable(venv_dir, script_name)
+            if not script_path.is_file():
+                msg = f"The wheel did not install the {script_name!r} command."
+                raise SystemExit(msg)
+            _run([str(script_path), "--help"])
 
     return 0
 
