@@ -73,15 +73,28 @@ class AttachError(ProbeError):
             An error whose message names the most likely remedy.
         """
         match cause:
+            case ProcessLookupError():
+                # A vanished target is its own outcome rather than a refused
+                # attach: nothing about the environment needs fixing, so it
+                # carries its own type and its own exit code.
+                return NoSuchProcessError(pid, _NO_SUCH_PROCESS_HINT, cause)
             case PermissionError():
                 hint = _PERMISSION_HINT
-            case ProcessLookupError():
-                hint = _NO_SUCH_PROCESS_HINT
             case RuntimeError() | ValueError():
                 hint = _REFUSED_HINT
             case _:
                 hint = _GENERIC_HINT
         return cls(pid, hint, cause)
+
+
+class NoSuchProcessError(AttachError):
+    """Raised when the pid pidprobe was pointed at does not exist.
+
+    Separate from a plain :class:`AttachError` because the remedy is
+    different in kind: nothing about the machine or its policies is wrong, so
+    a script that retries or scans pids wants to tell "gone" apart from
+    "blocked".
+    """
 
 
 class ProbeTimeoutError(ProbeError):

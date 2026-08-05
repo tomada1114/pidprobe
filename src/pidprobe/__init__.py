@@ -10,6 +10,7 @@ from ._doctor import diagnose
 from ._errors import (
     AttachError,
     ChannelError,
+    NoSuchProcessError,
     ProbeError,
     ProbeTimeoutError,
     TargetError,
@@ -42,6 +43,7 @@ __all__ = [
     "CollectorSpec",
     "Diagnosis",
     "Evaluation",
+    "NoSuchProcessError",
     "ProbeError",
     "ProbeTimeoutError",
     "TargetError",

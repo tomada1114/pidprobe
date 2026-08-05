@@ -17,6 +17,7 @@ from ._diagnosis import as_document, render_text
 from ._diff import iter_snapshot_deltas
 from ._doctor import diagnose
 from ._eval import evaluate_in_target
+from ._exits import EXIT_DIAGNOSIS_FAILED, EXIT_OK
 from ._snapshot import take_snapshot
 from .collectors._stacks import build_stacks_collector
 from .registry import available_collectors
@@ -26,24 +27,6 @@ if TYPE_CHECKING:
     from collections.abc import Mapping
 
     from .collectors import Collector
-
-EXIT_OK = 0
-"""Exit code for a command that ran and printed its output."""
-
-EXIT_PROBE_ERROR = 1
-"""Exit code for a probe that failed: attach, timeout, channel or target.
-
-``doctor`` reuses it for a diagnosis that found a blocking check, so "a probe
-of this pid would not work" is one exit code however it was discovered.
-"""
-
-EXIT_INTERRUPTED = 130
-"""Exit code for a command stopped with Ctrl-C, by the 128 + SIGINT convention.
-
-``diff`` without ``--count`` is meant to be ended this way, so an interrupt is
-a normal way to finish rather than a failure, and it is distinguished from
-:data:`EXIT_PROBE_ERROR` for a shell that wants to tell the two apart.
-"""
 
 _PRETTY_INDENT = 2
 _COMPACT_SEPARATORS = (",", ":")
@@ -121,10 +104,16 @@ def run_diff(args: argparse.Namespace) -> int:
 
 
 def run_doctor(args: argparse.Namespace) -> int:
-    """Run the attach preflight checks and print the report."""
+    """Run the attach preflight checks and print the report.
+
+    The report is the command's output whatever it says, so it goes to stdout
+    even when it is bad news; only the exit code separates the two, and a
+    blocking check gets its own so "the diagnosis says no" can be told apart
+    from "the diagnosis could not be made".
+    """
     diagnosis = diagnose(args.pid)
     if args.as_json:
         write_json(as_document(diagnosis), is_pretty=args.pretty)
     else:
         sys.stdout.write(render_text(diagnosis))
-    return EXIT_OK if diagnosis.is_attachable else EXIT_PROBE_ERROR
+    return EXIT_OK if diagnosis.is_attachable else EXIT_DIAGNOSIS_FAILED
