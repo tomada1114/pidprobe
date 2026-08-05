@@ -1,0 +1,14 @@
+# The demo image is built from the repository root but only needs the
+# package source, its metadata and demo/. Everything else is excluded so the
+# build context stays small and a local .venv can never leak into the image.
+*
+!pyproject.toml
+!README.md
+!LICENSE
+!src
+!demo
+
+# Re-excluded after the allow-list above, which would otherwise pull in
+# whatever a local run left behind.
+**/__pycache__
+**/*.pyc

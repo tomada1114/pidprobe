@@ -170,6 +170,11 @@ indent-style = "space"
 [tool.mypy]
 python_version = "3.14"
 strict = true
+# `demo/` is deliberately outside the type checker's reach. Checking it would
+# mean installing fastapi, uvicorn and their stubs into the dev environment,
+# and the demo's whole point is that its dependencies never enter this file.
+# Ruff still lints it, and CI still builds and runs the image it lives in.
+exclude = ["^demo/"]
 warn_return_any = true
 warn_unused_configs = true
 warn_unused_ignores = true
