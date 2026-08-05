@@ -82,7 +82,11 @@ for _ in $(seq 1 100); do
     sleep 0.2
 done
 
-clear
+# Wipe the startup noise so a recording opens on an empty screen. Tolerated
+# rather than required: `clear` has nothing to do without a TERM, which is
+# the case on a CI runner.
+clear 2>/dev/null || true
+
 note 'the app is up and answering normally'
 run curl -s "${BASE}/widgets"
 sleep 1
