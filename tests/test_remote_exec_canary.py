@@ -25,6 +25,8 @@ from typing import IO
 
 import pytest
 
+from .conftest import skip_unless_remote_exec_supported
+
 pytestmark = pytest.mark.integration
 
 TARGET_SCRIPT = Path(__file__).parent / "targets" / "sleeper.py"
@@ -125,10 +127,7 @@ def _wait_for_ready(stream: IO[str], timeout: float) -> None:
 
 
 def test_remote_exec_round_trip_returns_stack_envelope(tmp_path: Path) -> None:
-    if not hasattr(sys, "remote_exec"):
-        pytest.skip("sys.remote_exec is not available (requires CPython 3.14+)")
-    if sys.platform == "darwin" and os.geteuid() != 0:
-        pytest.skip("requires root on macOS (task_for_pid)")
+    skip_unless_remote_exec_supported()
 
     socket_path, fallback_dir = _socket_path(tmp_path)
     script_path = tmp_path / "inject.py"

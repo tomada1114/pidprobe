@@ -19,10 +19,35 @@ from pidprobe._envelope import Envelope
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterator
     from types import FrameType
+    from typing import NoReturn
 
 TARGETS_DIR = Path(__file__).parent / "targets"
 READY_TIMEOUT_SECONDS = 10.0
 KILL_TIMEOUT_SECONDS = 5.0
+
+REQUIRE_INTEGRATION_ENV = "PIDPROBE_REQUIRE_INTEGRATION"
+"""Set by CI jobs whose whole purpose is to run the integration tests.
+
+The integration tests skip themselves wherever injection is impossible, which
+is right on a contributor's machine and wrong in the job that exists to prove
+injection still works: 25 silent skips there look exactly like 25 passes. When
+this variable is set, an unmet precondition fails instead of skipping.
+"""
+
+
+def require_or_skip(reason: str) -> NoReturn:
+    """Skip because injection is unavailable -- or fail if CI demanded it."""
+    if os.environ.get(REQUIRE_INTEGRATION_ENV):
+        pytest.fail(f"{REQUIRE_INTEGRATION_ENV} is set, but {reason}")
+    pytest.skip(reason)
+
+
+def skip_unless_remote_exec_supported() -> None:
+    """Bail out of a test unless this machine can actually inject code."""
+    if not hasattr(sys, "remote_exec"):
+        require_or_skip("sys.remote_exec is not available (requires CPython 3.14+)")
+    if sys.platform == "darwin" and os.geteuid() != 0:
+        require_or_skip("requires root on macOS (task_for_pid)")
 
 
 def _test_process_frames() -> dict[int, FrameType]:
@@ -125,7 +150,4 @@ def spawn_target() -> Iterator[Callable[[str], subprocess.Popen[str]]]:
 @pytest.fixture
 def remote_exec_supported() -> None:
     """Skip the test unless this machine can actually inject code."""
-    if not hasattr(sys, "remote_exec"):
-        pytest.skip("sys.remote_exec is not available (requires CPython 3.14+)")
-    if sys.platform == "darwin" and os.geteuid() != 0:
-        pytest.skip("requires root on macOS (task_for_pid)")
+    skip_unless_remote_exec_supported()

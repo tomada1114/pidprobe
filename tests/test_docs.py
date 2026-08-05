@@ -1,9 +1,10 @@
 """Tests that keep the documentation and the shipped code from drifting apart.
 
-The pages these tests read describe surfaces the code owns -- the checks
-``pidprobe doctor`` reports, the exit codes, the subcommands -- and a rename in
-the code would otherwise leave the docs quietly wrong. Nothing here checks
-prose; each test pins one enumeration that exists in both places.
+The pages these tests read describe surfaces something else owns -- the checks
+``pidprobe doctor`` reports, the exit codes, the subcommands, and what CI
+actually runs on each platform -- and a rename on the owning side would
+otherwise leave the docs quietly wrong. Nothing here checks prose; each test
+pins one enumeration or one claim that exists in both places.
 """
 
 from __future__ import annotations
@@ -18,9 +19,14 @@ from pidprobe._doctor import diagnose
 from pidprobe._exits import EXIT_CODE_TABLE
 from pidprobe.cli import build_parser
 
-DOCS = Path(__file__).resolve().parents[1] / "docs"
+from .conftest import REQUIRE_INTEGRATION_ENV
+
+ROOT = Path(__file__).resolve().parents[1]
+DOCS = ROOT / "docs"
 TROUBLESHOOTING = DOCS / "troubleshooting.md"
 REFERENCE = DOCS / "reference.md"
+CONTRIBUTING = ROOT / "CONTRIBUTING.md"
+CI_WORKFLOW = ROOT / ".github" / "workflows" / "ci.yml"
 
 CHECK_MODULES = (_doctor, _attach_policy, _target_python)
 """Every module that builds a :class:`~pidprobe._diagnosis.Check`."""
@@ -110,3 +116,52 @@ def test_reference_documents_every_subcommand() -> None:
     documented = set(_COMMAND_PATTERN.findall(REFERENCE.read_text(encoding="utf-8")))
 
     assert set(match.group(1).split(",")) == documented
+
+
+def privileged_ci_step() -> str:
+    """Return the one ``ci.yml`` step that runs anything as root.
+
+    Steps are separated by blank lines, so a block is a step together with the
+    comment explaining it. Insisting there is exactly one keeps this pinned to
+    the macOS integration step rather than to whichever one happened to match.
+    """
+    blocks = CI_WORKFLOW.read_text(encoding="utf-8").split("\n\n")
+    privileged = [block for block in blocks if "sudo" in block]
+
+    assert len(privileged) == 1, f"ci.yml has {len(privileged)} privileged steps"
+    return privileged[0]
+
+
+def test_ci_reruns_the_integration_tests_as_root_on_macos() -> None:
+    """The privileged step is macOS-only and selects exactly the marked tests."""
+    step = privileged_ci_step()
+
+    assert "if: runner.os == 'macOS'" in step
+    assert "-m integration" in step
+    assert f"{REQUIRE_INTEGRATION_ENV}=1" in step
+
+
+def test_ci_demands_integration_coverage_wherever_it_expects_it() -> None:
+    """Both jobs that must run the integration tests refuse to skip them.
+
+    Linux gets the flag through the unprivileged run, macOS through the sudo
+    step; a job that lost it would go green on nothing but skips.
+    """
+    workflow = CI_WORKFLOW.read_text(encoding="utf-8")
+
+    assert workflow.count(REQUIRE_INTEGRATION_ENV) == 2
+
+
+def test_contributing_documents_the_macos_integration_strategy() -> None:
+    """CONTRIBUTING.md describes the macOS behaviour the workflow implements.
+
+    The acceptance criterion for the strategy is that the two agree, so this
+    pins the load-bearing nouns: the marker CI selects, the environment
+    variable it sets, and the macOS constraint that forces the sudo step.
+    """
+    contributing = CONTRIBUTING.read_text(encoding="utf-8")
+
+    assert "-m integration" in contributing
+    assert REQUIRE_INTEGRATION_ENV in contributing
+    assert "task_for_pid" in contributing
+    assert "sudo" in contributing

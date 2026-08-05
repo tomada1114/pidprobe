@@ -4,6 +4,20 @@ on:
   push:
     branches: [main]
     paths:
+      - ".github/workflows/docs.yml"
+      - "CONTRIBUTING.md"
+      - "docs/**"
+      - "mkdocs.yml"
+      - "pyproject.toml"
+      - "src/**"
+      - "uv.lock"
+  # Build (never deploy) on pull requests too. `mkdocs build --strict` turns a
+  # broken link or a page missing from the nav into an error, and without this
+  # trigger that error only ever surfaced after the merge had already landed.
+  # The path filter is duplicated because GitHub Actions ignores YAML anchors.
+  pull_request:
+    paths:
+      - ".github/workflows/docs.yml"
       - "CONTRIBUTING.md"
       - "docs/**"
       - "mkdocs.yml"
@@ -12,18 +26,47 @@ on:
       - "uv.lock"
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: false
+  # Superseded pull request builds are worth cancelling; a deploy in flight is
+  # not, because cancelling it can leave the published site half written.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  deploy:
-    name: Deploy Documentation
+  build:
+    name: Build Documentation
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      - uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990 # v8.3.2
+        with:
+          enable-cache: true
+          python-version: "3.14"
+
+      - name: Install dependencies
+        run: uv sync --group docs --locked
+
+      - name: Build docs strictly
+        run: uv run mkdocs build --strict
+
+  deploy:
+    name: Deploy Documentation
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      # Credentials are deliberately persisted here: `mkdocs gh-deploy` pushes
+      # the built site to gh-pages with them. The build job above, which needs
+      # no write access, sets persist-credentials: false instead.
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
       - uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990 # v8.3.2

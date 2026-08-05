@@ -86,6 +86,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `docs/assets/demo.gif`, recorded from `scripts/record_demo.sh` against the
   demo image: a hung request, then `pidprobe snap | jq` naming the two
   deadlocked threads and the connection pool they stranded.
+- The integration tests now really run on macOS in CI. macOS grants
+  `task_for_pid` only to root, so they used to skip there and the whole
+  injection path was covered by Linux alone; a second CI step re-runs
+  `pytest -m integration` under `sudo`, which GitHub's macOS runners allow.
+  `PIDPROBE_REQUIRE_INTEGRATION=1` turns "injection is unavailable" from a
+  skip into a failure, so neither the Linux nor the macOS job can go green on
+  25 silent skips. CONTRIBUTING.md documents what runs where and how to run
+  the same tests on your own Mac, and a test asserts that description still
+  matches the workflow.
 
 ### Changed
 
@@ -124,6 +133,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The ruff pinned by pre-commit is back in step with the one in `uv.lock`, so
   the pre-commit hook and `just lint` no longer disagree about which rules
   apply.
+- `mkdocs build --strict` now runs on pull requests as well as on pushes to
+  `main`. A broken link or a page missing from the nav used to merge green and
+  fail only afterwards, on the deploy that publishes the site.
 
 ## [0.0.1] - 2026-08-04
 

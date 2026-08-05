@@ -54,6 +54,69 @@ uv run pytest --cov=pidprobe --cov-branch --cov-report=term-missing:skip-covered
 uv build && uv run python scripts/smoke_test.py
 ```
 
+## Integration Tests and the macOS Root Requirement
+
+Tests marked `integration` attach to a real child process with
+`sys.remote_exec` (PEP 768) instead of faking the injection. They are the only
+tests that prove the round trip actually works, so they are worth running
+before you send a change that touches injection, the channel, or the
+collectors.
+
+```bash
+# Just the ones that attach to a live target
+uv run pytest -m integration
+
+# Everything except them
+uv run pytest -m "not integration"
+```
+
+They skip themselves where injection is impossible:
+
+| Condition | What happens |
+| --- | --- |
+| `sys.remote_exec` missing (interpreter built with `PYTHON_DISABLE_REMOTE_DEBUG`) | skipped |
+| macOS, not root | skipped — `requires root on macOS (task_for_pid)` |
+| macOS, root | runs |
+| Linux, `kernel.yama.ptrace_scope` ≤ 1 | runs |
+
+**On macOS you need `sudo` to run them.** `sys.remote_exec` has to take the
+target's task port, and macOS grants that only to root or to a binary carrying
+the `com.apple.system-task-ports` entitlement — the same constraint
+`pidprobe doctor` reports as the `task_for_pid` check, and the reason it tells
+macOS users to run `sudo pidprobe snap <PID>`. It is a platform rule, not
+something pidprobe can work around. Locally:
+
+```bash
+uv sync --group dev
+sudo .venv/bin/python -B -m pytest -m integration -p no:cacheprovider
+```
+
+Call the virtual environment's interpreter directly rather than `sudo uv run`:
+`sudo` resets `HOME`, so `uv` would otherwise resolve a different cache and
+Python install as root. `-B` and `-p no:cacheprovider` stop the root process
+from leaving `__pycache__` and `.pytest_cache` entries your own user cannot
+overwrite afterwards.
+
+### What CI does
+
+The `Test` matrix (Python 3.14 and 3.15 × Ubuntu and macOS) runs the whole
+suite unprivileged, exactly as you would in your own shell:
+
+- **Ubuntu** — the integration tests run in that unprivileged pass. The job
+  also sets `PIDPROBE_REQUIRE_INTEGRATION=1`, which turns "injection is
+  unavailable" from a skip into a failure, so integration coverage cannot
+  quietly disappear behind a green check.
+- **macOS** — they skip in the unprivileged pass (`task_for_pid` is denied to
+  uid 501), and a second step re-runs `pytest -m integration` under `sudo`,
+  also with `PIDPROBE_REQUIRE_INTEGRATION=1`. GitHub's macOS runners give the
+  `runner` user passwordless `sudo`, and root does get the task port there, so
+  every integration test really does execute on macOS. Only that step is
+  privileged; the unprivileged pass is still what the rest of the matrix
+  exercises.
+
+So a red macOS job can mean the injection path broke on macOS specifically —
+it is not a platform where integration coverage is taken on faith.
+
 ## Pull Request Process
 
 1. Fork the repository and create a branch from `main`
