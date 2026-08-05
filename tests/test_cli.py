@@ -9,11 +9,11 @@ from typing import Any
 
 import pytest
 
-from pidprobe import __version__
+from pidprobe import __version__, available_collectors
 from pidprobe import cli as cli_module
 from pidprobe._errors import ProbeTimeoutError
 from pidprobe.cli import EXIT_OK, EXIT_PROBE_ERROR, build_parser, main
-from pidprobe.collectors import BUILTIN_COLLECTORS, STACKS_COLLECTOR
+from pidprobe.collectors import STACKS_COLLECTOR
 from pidprobe.collectors._stacks import build_stacks_collector
 
 SNAPSHOT = {"schema_version": "1.0", "meta": {"pid": 4321}, "gc": {"enabled": True}}
@@ -91,8 +91,10 @@ class TestSnapMasking:
         main(["snap", "4321", "--no-mask"])
 
         collectors = fake_snapshot["collectors"]
+        # Everything a default snapshot would run, plugins included -- only
+        # the stacks collector is swapped.
         assert [collector.name for collector in collectors] == [
-            collector.name for collector in BUILTIN_COLLECTORS
+            collector.name for collector in available_collectors()
         ]
         assert STACKS_COLLECTOR not in collectors
         by_name = {collector.name: collector for collector in collectors}

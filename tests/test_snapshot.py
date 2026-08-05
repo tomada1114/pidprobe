@@ -10,11 +10,17 @@ from typing import Any
 import fastjsonschema
 import pytest
 
-from pidprobe import SCHEMA_VERSION, ChannelError, TargetError, snapshot_schema
+from pidprobe import (
+    SCHEMA_VERSION,
+    ChannelError,
+    TargetError,
+    available_collectors,
+    snapshot_schema,
+)
 from pidprobe import _snapshot as snapshot_module
 from pidprobe._envelope import Envelope, ErrorInfo
 from pidprobe._snapshot import take_snapshot
-from pidprobe.collectors import BUILTIN_COLLECTORS, Collector
+from pidprobe.collectors import Collector
 
 
 @pytest.fixture
@@ -46,10 +52,10 @@ class TestTakeSnapshot:
     def test_snapshot_has_one_section_per_collector(self):
         snapshot = take_snapshot(os.getpid())
 
-        for collector in BUILTIN_COLLECTORS:
+        for collector in available_collectors():
             assert snapshot[collector.name] is not None
         assert [report["name"] for report in snapshot["meta"]["collectors"]] == [
-            collector.name for collector in BUILTIN_COLLECTORS
+            collector.name for collector in available_collectors()
         ]
         assert all(
             report["status"] == "ok" for report in snapshot["meta"]["collectors"]
