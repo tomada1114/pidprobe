@@ -18,15 +18,22 @@ Structured JSON snapshots of running CPython 3.14+ processes via PEP 768 - no ag
 
 ## Quick Example
 
-```python
-from pidprobe import add
+```bash
+pidprobe snap 12345 | jq '.stacks.threads[0].frames[0]'
+```
 
-result = add(1, 2)
-print(result)  # 3
+```python
+from pidprobe import take_snapshot
+
+snapshot = take_snapshot(12345)
+print(snapshot["meta"]["stop_duration_ms"])
 ```
 
 ## Next Steps
 
 - [Getting Started](getting-started.md) — setup and first steps
-- [API Reference](reference.md) — full API documentation
+- [API Reference](reference.md) — the commands, their options and the Python API
+- [Output Schema](output-schema.md) — every field of the JSON pidprobe prints
+- [Collector Plugins](plugins.md) — add your own snapshot section
+- [Troubleshooting](troubleshooting.md) — one section per `pidprobe doctor` check
 - [Contributing](contributing.md) — how to contribute

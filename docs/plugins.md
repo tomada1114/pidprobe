@@ -2,7 +2,9 @@
 
 A collector adds one top-level section to every snapshot. Any installed
 package can publish one, and pidprobe's own SQLAlchemy section is written
-exactly this way -- there is no special case for it in the core.
+exactly this way -- there is no special case for it in the core. What the
+section then looks like in the output is described in [Output
+schema](output-schema.md).
 
 ## The one thing to understand first
 
@@ -66,11 +68,43 @@ index of live objects that needs no such knowledge.
     The shipped collector reports those pools with `null` metrics instead, so
     a pool is never silently missing from the section.
 
+## The collector contract
+
+`Collector` is a frozen value object with exactly three string fields, and
+each one has rules:
+
+| Field | Rules |
+| --- | --- |
+| `name` | The snapshot key this collector fills. Must be a Python identifier, because it also names the generated function inside the target, and may not be `meta` or `schema_version`, which the snapshot format owns. A name a built-in or an earlier plugin already took is refused at discovery, so `stacks` always means what pidprobe documents. |
+| `source` | Python source run as a *function body* inside the target. It must assign a JSON-serializable value to `data`. It may call `_pidprobe_target_frames()`, which returns `{thread_id: frame}` for the target's threads -- the one thing the injected script provides that the standard library does not. |
+| `description` | One line, for documentation and diagnostics. |
+
+Because each snippet becomes a function body, every name it binds is local to
+that function: a collector cannot leak a name into the target's namespace, and
+two collectors cannot collide over one. Nothing is shared between them either,
+so a helper has to be defined in the snippet that uses it.
+
+`Collector` is a convenience, not a requirement. `CollectorSpec` is the typed
+protocol discovery accepts, so any object carrying `name`, `source` and
+`description` strings qualifies -- discovery copies the three values into a
+`Collector` of its own and validates them there.
+
+!!! warning
+
+    `source` runs in a process that is *stopped* while it runs, so its cost is
+    the target's latency. Keep it to reading state. Anything that blocks --
+    acquiring a lock the target may already hold, I/O, a network call -- risks
+    deadlocking the process you were trying to observe, since the injected
+    script may have interrupted the very thread holding what you want.
+
 ## Publishing it
 
 Register the collector in your own `pyproject.toml`, in the
-`pidprobe.collectors` entry point group. The entry point resolves either to a
-collector or to a zero-argument callable returning one:
+`pidprobe.collectors` entry point group -- the value of
+`COLLECTOR_ENTRY_POINT_GROUP` in the public API. The entry point resolves
+either to a collector or to a zero-argument callable returning one, so a
+plugin may hand over a module-level constant or build its collector only when
+it is asked for:
 
 ```toml
 [project.entry-points."pidprobe.collectors"]
@@ -105,6 +139,64 @@ $ pidprobe snap 12345 --pretty | jq .sqlalchemy
     connections are handed out beyond the pool, so a *negative* overflow means
     the pool has never been full.
 
+## Checking that it loaded
+
+A plugin that cannot be loaded does not fail the snapshot -- one broken plugin
+must not cost every other section -- so it is logged on the `pidprobe.registry`
+logger and left out, and an entry point published under the wrong group is
+never noticed at all. Two ways to see what pidprobe found, neither of which
+touches a target:
+
+```python
+from pidprobe import available_collectors, discover_collectors
+
+print([collector.name for collector in available_collectors()])
+print([collector.name for collector in discover_collectors()])
+```
+
+`discover_collectors()` returns only the plugins, ordered by entry point name;
+`available_collectors()` returns the built-ins in their output order followed
+by those plugins, which is exactly what a snapshot runs.
+
+```console
+$ pidprobe doctor
+  OK      collector_plugins     5 collectors will run: stacks, objects, gc, fds, sqlalchemy
+```
+
+`doctor` reports the same list, and turns what discovery logged into a warning
+naming the plugin it skipped -- see
+[`collector_plugins`](troubleshooting.md#collector_plugins). It is the quicker
+answer to "why is my section not in the output?".
+
+## Trying it without a target
+
+A collector is source text, so it can be run in *this* process before it is
+ever injected into another one. That is how pidprobe tests its own collectors,
+and it is the fastest way to iterate on yours:
+
+```python
+import sys
+import traceback
+
+from pidprobe.collectors import compose_collector_source
+from my_package.collectors import REDIS
+
+namespace = {"_pidprobe_sys": sys, "_pidprobe_traceback": traceback}
+exec(compose_collector_source([REDIS]), namespace)  # noqa: S102
+
+payload = namespace["payload"]
+print(payload["sections"]["redis"])
+print(payload["collectors"])
+```
+
+`compose_collector_source()` builds what the injected script would run: the
+per-collector functions plus the driver that times them and catches what they
+raise. The two `_pidprobe_` names are what the injected script would otherwise
+bind; add `"_pidprobe_target_frames"` to the namespace as well if your
+collector walks stacks. `payload["collectors"]` carries the same per-collector
+report a snapshot puts in `meta.collectors`, so a collector that raised shows
+up there with its traceback instead of taking the process down.
+
 ## What the plugin API guarantees
 
 | Failure | Cost |
@@ -122,7 +214,8 @@ will show up there -- but it cannot cost another collector its section.
 
 pidprobe registers the SQLAlchemy collector itself, so the `sqlalchemy`
 section is in every snapshot with no extra install. In a target that never
-imported SQLAlchemy it reports `"available": false` and nothing else.
+imported SQLAlchemy it reports `"available": false` and an empty `pools` list,
+which is the answer, not a failure.
 
 `pidprobe[sqlalchemy]` installs SQLAlchemy alongside pidprobe. The collector
 never needs it -- it reads the *target's* SQLAlchemy, not the prober's -- so
