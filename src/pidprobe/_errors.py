@@ -9,6 +9,11 @@ them applies.
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from ._envelope import ErrorInfo
+
 _TIMEOUT_MESSAGE = (
     "target never reached a safe eval point within {seconds:g}s; it may be "
     "blocked inside a C extension or a long syscall; try an out-of-process "
@@ -105,3 +110,25 @@ class ProbeTimeoutError(ProbeError):
 
 class ChannelError(ProbeError):
     """Raised when the return channel cannot be set up or returns garbage."""
+
+
+class TargetError(ProbeError):
+    """Raised when the injected code failed as a whole inside the target.
+
+    A single failing collector is reported per section instead, so this error
+    means the injected script itself could not produce a payload -- for
+    example because the collected data would not serialize.
+    """
+
+    def __init__(self, pid: int, error: ErrorInfo) -> None:
+        """Build the error.
+
+        Args:
+            pid: Process id the snapshot was taken from.
+            error: Failure details reported by the target.
+        """
+        super().__init__(
+            f"snapshot failed inside pid {pid}: {error['type']}: {error['message']}",
+        )
+        self.pid = pid
+        self.error = error
