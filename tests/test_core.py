@@ -30,6 +30,7 @@ class TestPackageMetadata:
             "ChannelError",
             "Collector",
             "CollectorSpec",
+            "Evaluation",
             "ProbeError",
             "ProbeTimeoutError",
             "TargetError",
@@ -37,6 +38,7 @@ class TestPackageMetadata:
             "add",
             "available_collectors",
             "discover_collectors",
+            "evaluate_in_target",
             "snapshot_schema",
             "take_snapshot",
         }
