@@ -1,0 +1,132 @@
+name: Demo Image
+
+# The demo image is never published by merging to main. Publishing is an
+# explicit act: run this workflow by hand, or push a release tag. Pull
+# requests that touch the demo only build it, to catch a Dockerfile or
+# dependency break before it reaches anyone.
+on:
+  pull_request:
+    paths:
+      - "demo/**"
+      - "scripts/record_demo.sh"
+      - ".github/workflows/demo-image.yml"
+      - ".dockerignore"
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  IMAGE_NAME: ghcr.io/${{ github.repository_owner }}/pidprobe-demo
+
+jobs:
+  build:
+    name: Build & Verify (no push)
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      - uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
+
+      # Loaded into the local daemon instead of pushed anywhere, so the image
+      # can actually be run below.
+      - name: Build image
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+        with:
+          context: .
+          file: demo/Dockerfile
+          push: false
+          load: true
+          tags: pidprobe-demo:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # The point of the demo is that pidprobe can attach to the app inside
+      # the image, so the check has to get that far rather than stop at a
+      # successful build.
+      - name: Run the recording script end to end
+        env:
+          PIDPROBE_DEMO_IMAGE: pidprobe-demo:ci
+          PIDPROBE_DEMO_CONTAINER: pidprobe-demo-ci
+          PIDPROBE_DEMO_PORT: "8000"
+        run: scripts/record_demo.sh
+
+      # The script above fails on a non-zero exit; this asserts on the
+      # content, so a snapshot that attaches but no longer finds the deadlock
+      # is caught too.
+      - name: Assert the snapshot shows the deadlock
+        run: |
+          set -euo pipefail
+          docker run --rm -d --name assert -p 8000:8000 \
+            --cap-add=SYS_PTRACE pidprobe-demo:ci
+          trap 'docker rm -f assert >/dev/null 2>&1 || true' EXIT
+          for _ in $(seq 1 100); do
+            curl -fs --max-time 1 localhost:8000/health >/dev/null && break
+            sleep 0.2
+          done
+          curl -fs -X POST localhost:8000/deadlock >/dev/null
+          curl -s --max-time 3 localhost:8000/reports/daily >/dev/null || true
+          docker exec assert pidprobe snap 1 > snapshot.json
+          jq -e '[.stacks.threads[]
+                  | select(.frames[0].function == "_ledger_writer"
+                           or .frames[0].function == "read_report")]
+                 | length == 2' snapshot.json
+          jq -e '.sqlalchemy.pools[0].checked_out == 2' snapshot.json
+
+  publish:
+    name: Build & Push to ghcr.io
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      - uses: docker/setup-qemu-action@96fe6ef7f33517b61c61be40b68a1882f3264fb8 # v4.2.0
+
+      - uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
+
+      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Derive tags
+        id: meta
+        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
+        with:
+          images: ${{ env.IMAGE_NAME }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=latest
+
+      # amd64 and arm64 both: the walkthrough is written for whatever laptop
+      # the reader has.
+      - name: Build and push
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+        with:
+          context: .
+          file: demo/Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
