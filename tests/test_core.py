@@ -34,6 +34,7 @@ class TestPackageMetadata:
             "CollectorSpec",
             "Diagnosis",
             "Evaluation",
+            "NoSuchProcessError",
             "ProbeError",
             "ProbeTimeoutError",
             "TargetError",

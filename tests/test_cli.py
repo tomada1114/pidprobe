@@ -2,26 +2,45 @@
 
 from __future__ import annotations
 
+import io
 import json
 import subprocess
 import sys
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import pytest
 
 from pidprobe import __version__, available_collectors
 from pidprobe import _commands as commands_module
 from pidprobe._diagnosis import Check, CheckStatus, Diagnosis
-from pidprobe._errors import AttachError, ChannelError, ProbeTimeoutError
+from pidprobe._errors import (
+    AttachError,
+    ChannelError,
+    NoSuchProcessError,
+    ProbeTimeoutError,
+    TargetError,
+)
+from pidprobe._exits import EXIT_CODE_TABLE
 from pidprobe.cli import (
+    EXIT_ATTACH_FAILED,
+    EXIT_BROKEN_PIPE,
+    EXIT_DIAGNOSIS_FAILED,
+    EXIT_INTERNAL_ERROR,
     EXIT_INTERRUPTED,
     EXIT_OK,
     EXIT_PROBE_ERROR,
+    EXIT_TARGET_ERROR,
+    EXIT_TARGET_NOT_FOUND,
+    EXIT_TIMEOUT,
+    EXIT_USAGE,
     build_parser,
     main,
 )
 from pidprobe.collectors import STACKS_COLLECTOR
 from pidprobe.collectors._stacks import build_stacks_collector
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 SNAPSHOT = {"schema_version": "1.0", "meta": {"pid": 4321}, "gc": {"enabled": True}}
 EVALUATION = {
@@ -174,7 +193,7 @@ class TestEval:
         exit_code = main(["eval", "4321", "1 + 1"])
 
         captured = capsys.readouterr()
-        assert exit_code == EXIT_PROBE_ERROR
+        assert exit_code == EXIT_TIMEOUT
         assert captured.out == ""
         assert captured.err.startswith("pidprobe: ")
 
@@ -271,7 +290,7 @@ class TestDiff:
         exit_code = main(["diff", "4321", "--interval", "0.01"])
 
         captured = capsys.readouterr()
-        assert exit_code == EXIT_PROBE_ERROR
+        assert exit_code == EXIT_TIMEOUT
         # A target that stops answering ends the series; what it already said
         # stays on stdout and the reason goes to stderr.
         assert json.loads(captured.out) == DELTAS[0]
@@ -332,7 +351,7 @@ class TestDoctor:
         assert fake_diagnosis["pid"] == 4321
         assert "return_channel" in out
 
-    def test_a_blocking_check_exits_with_the_probe_error_code(
+    def test_a_blocking_check_exits_with_the_diagnosis_code(
         self,
         fake_diagnosis,
         capsys,
@@ -342,7 +361,9 @@ class TestDoctor:
         exit_code = main(["doctor", "4321"])
 
         out = capsys.readouterr().out
-        assert exit_code == EXIT_PROBE_ERROR
+        # Its own code: the diagnosis itself succeeded, and a preflight script
+        # wants that apart from "the diagnosis could not be produced".
+        assert exit_code == EXIT_DIAGNOSIS_FAILED
         assert "cause: macOS denies task_for_pid" in out
         assert "confirm: id -u" in out
         assert "fix: rerun under sudo" in out
@@ -379,13 +400,31 @@ class TestDoctor:
         assert doctor_args.as_json is False
 
 
+def _raise_from_every_probe(monkeypatch: Any, error: BaseException) -> None:
+    """Make whichever probe the command under test runs fail with *error*."""
+
+    def failing(*_args: Any, **_kwargs: Any) -> Any:
+        raise error
+
+    monkeypatch.setattr(commands_module, "take_snapshot", failing)
+    monkeypatch.setattr(commands_module, "evaluate_in_target", failing)
+    monkeypatch.setattr(commands_module, "iter_snapshot_deltas", failing)
+
+
+PROBING_ARGV = [
+    pytest.param(["snap", "4321"], id="snap"),
+    pytest.param(["eval", "4321", "1 + 1"], id="eval"),
+    pytest.param(["diff", "4321", "--interval", "0.01"], id="diff"),
+]
+
+
 class TestErrorHandling:
     @pytest.mark.usefixtures("failing_snapshot")
     def test_probe_failure_is_explained_on_stderr(self, capsys):
         exit_code = main(["snap", "4321"])
 
         captured = capsys.readouterr()
-        assert exit_code == EXIT_PROBE_ERROR
+        assert exit_code == EXIT_TIMEOUT
         assert captured.out == ""
         assert captured.err.startswith("pidprobe: ")
         assert "pidprobe doctor 4321" in captured.err
@@ -396,26 +435,23 @@ class TestErrorHandling:
             pytest.param(AttachError(4321, "permission denied"), id="attach"),
             pytest.param(ChannelError("target sent nothing"), id="channel"),
             pytest.param(ProbeTimeoutError(5.0, 4321), id="timeout"),
+            pytest.param(
+                TargetError(
+                    4321, {"type": "TypeError", "message": "nope", "traceback": ""}
+                ),
+                id="target",
+            ),
         ],
     )
-    @pytest.mark.parametrize(
-        "argv",
-        [
-            pytest.param(["snap", "4321"], id="snap"),
-            pytest.param(["eval", "4321", "1 + 1"], id="eval"),
-        ],
-    )
+    @pytest.mark.parametrize("argv", PROBING_ARGV)
     def test_every_failure_points_at_doctor(self, monkeypatch, capsys, error, argv):
-        def failing(*_args: Any, **_kwargs: Any) -> dict[str, Any]:
-            raise error
+        _raise_from_every_probe(monkeypatch, error)
 
-        monkeypatch.setattr(commands_module, "take_snapshot", failing)
-        monkeypatch.setattr(commands_module, "evaluate_in_target", failing)
-
-        exit_code = main(argv)
+        main(argv)
 
         stderr = capsys.readouterr().err
-        assert exit_code == EXIT_PROBE_ERROR
+        # Exactly once: the timeout message already carries the hint, and a
+        # second copy appended here would read as two different suggestions.
         assert stderr.count("pidprobe doctor 4321") == 1
 
     def test_a_failure_without_a_pid_cannot_suggest_one(self, monkeypatch, capsys):
@@ -430,6 +466,23 @@ class TestErrorHandling:
         stderr = capsys.readouterr().err
         assert exit_code == EXIT_PROBE_ERROR
         assert stderr == "pidprobe: no channel\n"
+
+    def test_a_failing_doctor_does_not_suggest_running_doctor(
+        self,
+        monkeypatch,
+        capsys,
+    ):
+        def failing(_pid: int | None) -> Diagnosis:
+            message = "no channel"
+            raise ChannelError(message)
+
+        monkeypatch.setattr(commands_module, "diagnose", failing)
+
+        exit_code = main(["doctor", "4321"])
+
+        stderr = capsys.readouterr().err
+        assert exit_code == EXIT_PROBE_ERROR
+        assert "pidprobe doctor" not in stderr
 
     @pytest.mark.parametrize(
         "argv",
@@ -466,8 +519,284 @@ class TestErrorHandling:
         with pytest.raises(SystemExit) as info:
             main(argv)
 
-        assert info.value.code == 2
+        assert info.value.code == EXIT_USAGE
         assert capsys.readouterr().err
+
+
+class TestExitCodes:
+    """Every failure category a script is meant to be able to tell apart."""
+
+    @pytest.mark.parametrize(
+        ("error", "expected_code"),
+        [
+            pytest.param(
+                AttachError.from_cause(4321, ProcessLookupError(3, "gone")),
+                EXIT_TARGET_NOT_FOUND,
+                id="target-not-found",
+            ),
+            pytest.param(
+                AttachError(4321, "permission denied"),
+                EXIT_ATTACH_FAILED,
+                id="attach-failed",
+            ),
+            pytest.param(ProbeTimeoutError(5.0, 4321), EXIT_TIMEOUT, id="timeout"),
+            pytest.param(
+                TargetError(
+                    4321,
+                    {"type": "NameError", "message": "no queue", "traceback": ""},
+                ),
+                EXIT_TARGET_ERROR,
+                id="target-error",
+            ),
+            pytest.param(
+                ChannelError("target sent nothing"),
+                EXIT_PROBE_ERROR,
+                id="unclassified-probe-error",
+            ),
+        ],
+    )
+    @pytest.mark.parametrize("argv", PROBING_ARGV)
+    def test_each_failure_category_has_its_own_code(
+        self,
+        monkeypatch,
+        capsys,
+        error,
+        expected_code,
+        argv,
+    ):
+        _raise_from_every_probe(monkeypatch, error)
+
+        exit_code = main(argv)
+
+        assert exit_code == expected_code
+        assert capsys.readouterr().err.startswith("pidprobe: ")
+
+    def test_a_vanished_target_is_not_reported_as_a_refused_attach(self, monkeypatch):
+        # The two share a message shape and used to share an exit code, which
+        # is exactly the distinction a retrying script needs.
+        _raise_from_every_probe(monkeypatch, NoSuchProcessError(4321, "gone"))
+
+        assert main(["snap", "4321"]) == EXIT_TARGET_NOT_FOUND
+
+    def test_an_unexpected_error_is_summarised_not_traced(self, monkeypatch, capsys):
+        def exploding(*_args: Any, **_kwargs: Any) -> Any:
+            message = "cannot diff snapshots of different processes"
+            raise ValueError(message)
+
+        monkeypatch.setattr(commands_module, "take_snapshot", exploding)
+
+        exit_code = main(["snap", "4321"])
+
+        stderr = capsys.readouterr().err
+        assert exit_code == EXIT_INTERNAL_ERROR
+        assert "internal error: ValueError: cannot diff snapshots" in stderr
+        assert "Traceback" not in stderr
+        assert "--debug" in stderr
+
+    @pytest.mark.parametrize(
+        "argv",
+        [
+            pytest.param(["--debug", "snap", "4321"], id="flag"),
+            pytest.param(["snap", "4321"], id="env-var"),
+        ],
+    )
+    def test_debug_lets_the_real_traceback_escape(self, monkeypatch, argv):
+        def exploding(*_args: Any, **_kwargs: Any) -> Any:
+            message = "boom"
+            raise ValueError(message)
+
+        monkeypatch.setattr(commands_module, "take_snapshot", exploding)
+        if "--debug" not in argv:
+            monkeypatch.setenv("PIDPROBE_DEBUG", "1")
+
+        with pytest.raises(ValueError, match="boom"):
+            main(argv)
+
+    def test_debug_env_var_set_to_zero_is_off(self, monkeypatch, capsys):
+        def exploding(*_args: Any, **_kwargs: Any) -> Any:
+            message = "boom"
+            raise ValueError(message)
+
+        monkeypatch.setattr(commands_module, "take_snapshot", exploding)
+        monkeypatch.setenv("PIDPROBE_DEBUG", "0")
+
+        assert main(["snap", "4321"]) == EXIT_INTERNAL_ERROR
+        assert "internal error" in capsys.readouterr().err
+
+    @pytest.mark.parametrize("argv", PROBING_ARGV)
+    def test_ctrl_c_is_not_a_failure(self, monkeypatch, argv):
+        _raise_from_every_probe(monkeypatch, KeyboardInterrupt())
+
+        assert main(argv) == EXIT_INTERRUPTED
+
+    def test_a_closed_pipe_ends_quietly(self, monkeypatch, capsys):
+        # `pidprobe snap PID | head -1` is ordinary; it must not end in the
+        # interpreter's own "Exception ignored" noise.
+        _raise_from_every_probe(monkeypatch, BrokenPipeError())
+
+        exit_code = main(["snap", "4321"])
+
+        assert exit_code == EXIT_BROKEN_PIPE
+        assert capsys.readouterr().err == ""
+
+    @pytest.mark.usefixtures("fake_diagnosis")
+    def test_a_reader_leaving_after_the_output_is_written_ends_quietly(
+        self,
+        monkeypatch,
+        capsys,
+    ):
+        # doctor writes its report without flushing, so the pipe only breaks
+        # when the buffer is emptied -- which the CLI does itself rather than
+        # leaving to interpreter shutdown, where it would be unreportable.
+        class ClosedPipe(io.StringIO):
+            def flush(self) -> None:
+                raise BrokenPipeError
+
+        monkeypatch.setattr(sys, "stdout", ClosedPipe())
+
+        exit_code = main(["doctor", "4321"])
+
+        assert exit_code == EXIT_BROKEN_PIPE
+        assert capsys.readouterr().err == ""
+
+    @pytest.mark.usefixtures("fake_diagnosis")
+    def test_a_broken_stdout_is_redirected_so_shutdown_stays_quiet(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        # Reporting the broken pipe is only half of it: the descriptor has to
+        # stop pointing at the dead reader, or the interpreter's own flush on
+        # the way out raises again where nothing can catch it.
+        path = tmp_path / "stdout"
+        with path.open("w") as handle:
+
+            class ClosedPipe:
+                def write(self, text: str) -> int:
+                    return handle.write(text)
+
+                def flush(self) -> None:
+                    raise BrokenPipeError
+
+                def fileno(self) -> int:
+                    return handle.fileno()
+
+            monkeypatch.setattr(sys, "stdout", ClosedPipe())
+
+            exit_code = main(["doctor", "4321"])
+
+            # Now backed by the void, so the final flush cannot fail.
+            handle.write("written after the reader left")
+
+        assert exit_code == EXIT_BROKEN_PIPE
+        assert capsys.readouterr().err == ""
+
+    def test_every_documented_code_is_unique(self):
+        codes = [code for code, _ in EXIT_CODE_TABLE]
+
+        assert len(set(codes)) == len(codes)
+
+
+class TestGlobalTimeout:
+    def test_a_global_timeout_reaches_every_probing_subcommand(self, fake_snapshot):
+        main(["--timeout", "2.5", "snap", "4321"])
+
+        assert fake_snapshot["timeout_seconds"] == pytest.approx(2.5)
+
+    def test_the_subcommand_timeout_wins_over_the_global_one(self, fake_snapshot):
+        # More specific wins: the option nearer the command it applies to.
+        main(["--timeout", "2.5", "snap", "4321", "--timeout", "0.5"])
+
+        assert fake_snapshot["timeout_seconds"] == pytest.approx(0.5)
+
+    def test_without_either_the_built_in_budget_applies(self, fake_snapshot):
+        main(["snap", "4321"])
+
+        assert fake_snapshot["timeout_seconds"] == pytest.approx(5.0)
+
+    def test_a_global_timeout_reaches_the_sampler(self, fake_deltas):
+        main(["--timeout", "2.5", "diff", "4321", "--interval", "0.01"])
+
+        assert fake_deltas["timeout_seconds"] == pytest.approx(2.5)
+
+    def test_a_global_timeout_reaches_the_evaluation(self, fake_evaluation):
+        main(["--timeout", "2.5", "eval", "4321", "1 + 1"])
+
+        assert fake_evaluation["timeout_seconds"] == pytest.approx(2.5)
+
+    @pytest.mark.parametrize(
+        "argv",
+        [
+            pytest.param(["--timeout", "0", "snap", "4321"], id="zero"),
+            pytest.param(["--timeout", "nan", "snap", "4321"], id="nan"),
+            pytest.param(["--timeout", "inf", "snap", "4321"], id="inf"),
+            pytest.param(["--timeout", "nope", "snap", "4321"], id="non-numeric"),
+        ],
+    )
+    def test_an_invalid_global_timeout_is_rejected(self, argv):
+        with pytest.raises(SystemExit) as info:
+            main(argv)
+
+        assert info.value.code == EXIT_USAGE
+
+    @pytest.mark.usefixtures("fake_diagnosis")
+    def test_doctor_accepts_a_global_timeout_without_using_it(self):
+        # doctor never attaches, so there is nothing to budget; accepting the
+        # option keeps `pidprobe --timeout N <anything>` from failing.
+        assert main(["--timeout", "2.5", "doctor", "4321"]) == EXIT_OK
+
+
+class TestHelp:
+    def _help(self, capsys, argv):
+        with pytest.raises(SystemExit):
+            main([*argv, "--help"])
+        return capsys.readouterr().out
+
+    @pytest.mark.parametrize("command", ["snap", "eval", "diff", "doctor"])
+    def test_top_level_help_lists_every_subcommand(self, capsys, command):
+        assert command in self._help(capsys, [])
+
+    @pytest.mark.parametrize("option", ["--version", "--timeout", "--debug", "--help"])
+    def test_top_level_help_documents_every_global_option(self, capsys, option):
+        assert option in self._help(capsys, [])
+
+    @pytest.mark.parametrize(("code", "meaning"), EXIT_CODE_TABLE)
+    def test_top_level_help_documents_every_exit_code(self, capsys, code, meaning):
+        out = self._help(capsys, [])
+
+        assert f"{code}" in out
+        assert meaning in out
+
+    def test_snap_help_names_the_plugin_mechanism(self, capsys):
+        # A plugin silently adding a section to every snapshot is exactly the
+        # kind of thing --help has to say out loud.
+        assert "plugin" in self._help(capsys, ["snap"])
+
+    @pytest.mark.parametrize(
+        ("command", "arguments"),
+        [
+            pytest.param("snap", ["pid", "--pretty", "--timeout", "--no-mask"]),
+            pytest.param(
+                "eval",
+                ["pid", "EXPR", "--pretty", "--timeout", "--no-mask"],
+            ),
+            pytest.param(
+                "diff",
+                ["pid", "--interval", "--count", "--pretty", "--timeout"],
+            ),
+            pytest.param("doctor", ["pid", "--json", "--pretty"]),
+        ],
+    )
+    def test_every_subcommand_documents_every_argument_it_takes(
+        self,
+        capsys,
+        command,
+        arguments,
+    ):
+        out = self._help(capsys, [command])
+
+        assert [argument for argument in arguments if argument not in out] == []
 
 
 class TestEntryPoint:

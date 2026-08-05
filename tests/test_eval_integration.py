@@ -16,7 +16,7 @@ import pytest
 
 from pidprobe import TargetError, evaluate_in_target
 from pidprobe._saferepr import MASK_PLACEHOLDER
-from pidprobe.cli import EXIT_OK, EXIT_PROBE_ERROR, main
+from pidprobe.cli import EXIT_OK, EXIT_TARGET_ERROR, main
 
 if TYPE_CHECKING:
     import subprocess
@@ -123,6 +123,8 @@ def test_cli_explains_a_failing_expression_on_stderr(
     exit_code = main(["eval", str(proc.pid), "1 / 0"])
 
     captured = capsys.readouterr()
-    assert exit_code == EXIT_PROBE_ERROR
+    # A bad expression is the target's answer, not a failure to reach it, so
+    # it gets the target-error code rather than a generic probe failure.
+    assert exit_code == EXIT_TARGET_ERROR
     assert captured.out == ""
     assert "ZeroDivisionError" in captured.err

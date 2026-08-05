@@ -90,7 +90,7 @@ $ pidprobe eval 12345 'len(queue)'
 The expression is compiled inside the target, against a copy of its `__main__`
 namespace, and the result goes through the same bounds and masking as stack
 locals. Statements are refused — `cache = {}` comes back as a `SyntaxError` —
-and anything the expression raises is reported on stderr with exit code `1`,
+and anything the expression raises is reported on stderr with exit code `6`,
 never as a hang.
 
 ```python
@@ -121,6 +121,42 @@ from pidprobe import iter_snapshot_deltas
 for delta in iter_snapshot_deltas(12345, interval_seconds=5, count=3):
     print(delta["objects"]["types"][:3])
 ```
+
+## Exit codes
+
+A failing probe is something a script has to react to, so the reason is in the
+exit code and not only in the message:
+
+| Code | Meaning |
+| --- | --- |
+| `0` | Success |
+| `1` | Probe failed, with no more specific code |
+| `2` | Invalid command line |
+| `3` | No such process |
+| `4` | Attaching to the target was refused |
+| `5` | The target did not answer within the timeout |
+| `6` | The injected code raised inside the target |
+| `7` | `doctor` found a check that blocks attaching |
+| `70` | pidprobe hit an unexpected error — a bug |
+| `130` | Interrupted with Ctrl-C |
+| `141` | The reader of stdout closed the pipe |
+
+`pidprobe --help` prints the same table. Errors arrive on stderr as a single
+`pidprobe: ...` line — never a traceback — and every `snap`, `eval` or `diff`
+failure points at `pidprobe doctor <PID>`. `doctor` is the exception: its
+report goes to stdout whatever it says, because the report is the output.
+
+A global `--timeout` before the subcommand overrides the 5-second default for
+whichever command follows, and the same option after the subcommand overrides
+that in turn:
+
+```bash
+pidprobe --timeout 30 snap 12345      # this probe gets 30 seconds
+pidprobe --timeout 30 diff 12345 --interval 5 --timeout 2   # 2 wins
+```
+
+If pidprobe ever exits `70`, that is a bug in pidprobe. Re-run with `--debug`
+(or `PIDPROBE_DEBUG=1`) for the traceback and please report it.
 
 ## Secret masking
 
@@ -158,23 +194,30 @@ point in the `pidprobe.collectors` group:
 
 ```toml
 [project.entry-points."pidprobe.collectors"]
-sqlalchemy = "pidprobe_sqlalchemy:COLLECTOR"
+redis = "my_package.collectors:REDIS"
 ```
 
 ```python
 from pidprobe import Collector
 
-COLLECTOR = Collector(
-    name="sqlalchemy",
-    source='import sqlalchemy\n\ndata = {"version": sqlalchemy.__version__}',
-    description="SQLAlchemy engine and pool state",
+REDIS = Collector(
+    name="redis",
+    source="""
+import sys
+
+module = sys.modules.get("redis")
+data = {"available": module is not None}
+""",
+    description="whether the target has Redis loaded",
 )
 ```
 
 `source` runs inside the *target* process and assigns `data`, which becomes the
-`sqlalchemy` section of the snapshot. A plugin that fails to load, or that
-raises inside the target, costs only its own section — every other collector
-still reports. See the
+`redis` section of the snapshot. It must never `import` the library it reports
+on — that would load it into a process that never asked for it — so it looks
+in `sys.modules` instead. A plugin that fails to load, or that raises inside
+the target, costs only its own section — every other collector still reports.
+See the
 [API Reference](https://tomada1114.github.io/pidprobe/reference/#collector-plugins)
 for the full contract, and
 [Writing a collector plugin](https://tomada1114.github.io/pidprobe/plugins/)

@@ -1,233 +1,72 @@
-"""Command-line interface for pidprobe.
+"""Command-line entry point for pidprobe.
 
-Every subcommand is registered in :func:`build_parser` and dispatched through
-the ``handler`` default it sets, so adding one means adding a parser here and
-a handler in :mod:`pidprobe._commands` -- nothing in :func:`main` changes.
+:func:`main` is the only place that turns a failure into an exit code and a
+line on stderr, and it dispatches through the ``handler`` default each
+subcommand sets, so adding one means a parser in :mod:`pidprobe._parsers` and
+a handler in :mod:`pidprobe._commands` -- nothing here changes.
 """
 
 from __future__ import annotations
 
 import argparse
-import math
+import contextlib
+import os
 import sys
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 from ._channel import DEFAULT_TIMEOUT_SECONDS
-from ._commands import (
+from ._errors import ProbeError
+from ._exits import (
+    EXIT_ATTACH_FAILED,
+    EXIT_BROKEN_PIPE,
+    EXIT_DIAGNOSIS_FAILED,
+    EXIT_INTERNAL_ERROR,
     EXIT_INTERRUPTED,
     EXIT_OK,
     EXIT_PROBE_ERROR,
-    run_diff,
-    run_doctor,
-    run_eval,
-    run_snap,
+    EXIT_TARGET_ERROR,
+    EXIT_TARGET_NOT_FOUND,
+    EXIT_TIMEOUT,
+    EXIT_USAGE,
+    describe,
+    format_exit_codes,
 )
-from ._errors import ProbeError
+from ._parsers import add_subcommands, positive_float
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Sequence
 
-_DOCTOR_HINT = "run `pidprobe doctor {pid}` for attach diagnostics"
-
 _PROGRAM_NAME = "pidprobe"
 
+_DEBUG_ENV_VAR = "PIDPROBE_DEBUG"
+
+_HINTING_COMMANDS = frozenset({"snap", "eval", "diff"})
+"""Subcommands whose failures are worth answering with ``doctor``.
+
+``doctor`` is left out: telling someone whose ``doctor`` run failed to run
+``doctor`` is not advice.
+"""
+
+_BUG_REPORT_HINT = (
+    "this is a bug in pidprobe; re-run with --debug (or PIDPROBE_DEBUG=1) for "
+    "the traceback and report it at https://github.com/tomada1114/pidprobe/issues"
+)
+
 __all__ = [
+    "EXIT_ATTACH_FAILED",
+    "EXIT_BROKEN_PIPE",
+    "EXIT_DIAGNOSIS_FAILED",
+    "EXIT_INTERNAL_ERROR",
     "EXIT_INTERRUPTED",
     "EXIT_OK",
     "EXIT_PROBE_ERROR",
+    "EXIT_TARGET_ERROR",
+    "EXIT_TARGET_NOT_FOUND",
+    "EXIT_TIMEOUT",
+    "EXIT_USAGE",
     "build_parser",
     "main",
 ]
-
-
-def _positive_int(value: str) -> int:
-    """Parse a strictly positive integer argument.
-
-    Raises:
-        ArgumentTypeError: If the value is not a positive integer.
-    """
-    try:
-        number = int(value)
-    except ValueError:
-        message = f"expected an integer, got {value!r}"
-        raise argparse.ArgumentTypeError(message) from None
-    if number <= 0:
-        message = f"expected a positive integer, got {number}"
-        raise argparse.ArgumentTypeError(message)
-    return number
-
-
-def _positive_float(value: str) -> float:
-    """Parse a strictly positive, finite float argument.
-
-    Infinity and NaN are rejected rather than passed on: ``nan`` compares
-    false against every bound, so it would slip through as a duration that
-    never elapses and never times out.
-
-    Raises:
-        ArgumentTypeError: If the value is not a positive, finite number.
-    """
-    try:
-        number = float(value)
-    except ValueError:
-        message = f"expected a number, got {value!r}"
-        raise argparse.ArgumentTypeError(message) from None
-    if not math.isfinite(number) or number <= 0:
-        message = f"expected a positive number, got {number}"
-        raise argparse.ArgumentTypeError(message)
-    return number
-
-
-def _add_common_options(parser: argparse.ArgumentParser) -> None:
-    """Add the options every probing subcommand shares."""
-    parser.add_argument(
-        "--pretty",
-        action="store_true",
-        help="indent the JSON instead of printing it on a single line",
-    )
-    parser.add_argument(
-        "--timeout",
-        type=_positive_float,
-        default=DEFAULT_TIMEOUT_SECONDS,
-        metavar="SECONDS",
-        help=(
-            f"hard budget for the whole probe (default: {DEFAULT_TIMEOUT_SECONDS:g})"
-        ),
-    )
-
-
-def _add_mask_option(parser: argparse.ArgumentParser, *, mask_help: str) -> None:
-    """Add ``--no-mask`` to a subcommand that reports values from the target.
-
-    Args:
-        parser: Subcommand parser to extend.
-        mask_help: What ``--no-mask`` does in this subcommand, phrased as the
-            first clause of its help text.
-    """
-    parser.add_argument(
-        "--no-mask",
-        dest="is_masked",
-        action="store_false",
-        help=(
-            f"{mask_help}; masking is on by default and happens inside the "
-            "target process"
-        ),
-    )
-
-
-def _add_snap_parser(subcommands: argparse._SubParsersAction[Any]) -> None:
-    """Register the ``snap`` subcommand."""
-    snap = subcommands.add_parser(
-        "snap",
-        help="collect one snapshot of a running process",
-        description=(
-            "Inject the built-in collectors, plus any installed collector "
-            "plugin, into a running process and print one JSON snapshot of "
-            "its threads, objects, GC state and open file descriptors."
-        ),
-    )
-    snap.add_argument("pid", type=_positive_int, help="process id of the target")
-    _add_common_options(snap)
-    _add_mask_option(
-        snap,
-        mask_help="show credential-like locals instead of masking them",
-    )
-    snap.set_defaults(handler=run_snap)
-
-
-def _add_eval_parser(subcommands: argparse._SubParsersAction[Any]) -> None:
-    """Register the ``eval`` subcommand."""
-    evaluate = subcommands.add_parser(
-        "eval",
-        help="evaluate one expression inside a running process",
-        description=(
-            "Evaluate a Python expression against a copy of the target's "
-            "__main__ namespace and print its bounded, credential-masking "
-            "repr as JSON. Statements are rejected: an evaluation reads the "
-            "target rather than rebinding its names."
-        ),
-    )
-    evaluate.add_argument("pid", type=_positive_int, help="process id of the target")
-    evaluate.add_argument(
-        "expression",
-        metavar="EXPR",
-        help="Python expression to evaluate inside the target",
-    )
-    _add_common_options(evaluate)
-    _add_mask_option(
-        evaluate,
-        mask_help="show a credential-like result instead of masking it",
-    )
-    evaluate.set_defaults(handler=run_eval)
-
-
-def _add_diff_parser(subcommands: argparse._SubParsersAction[Any]) -> None:
-    """Register the ``diff`` subcommand."""
-    diff = subcommands.add_parser(
-        "diff",
-        help="report what changed between repeated snapshots of a process",
-        description=(
-            "Sample a running process every --interval seconds and print only "
-            "what moved between two consecutive samples: object counts per "
-            "type, ranked by growth, garbage collector statistics and the "
-            "number of open file descriptors. Each delta is printed as one "
-            "JSON line as soon as it is ready, so a leak can be watched "
-            "growing. Only the objects, gc and fds collectors run."
-        ),
-    )
-    diff.add_argument("pid", type=_positive_int, help="process id of the target")
-    diff.add_argument(
-        "--interval",
-        type=_positive_float,
-        required=True,
-        metavar="SECONDS",
-        help="seconds between the starts of two consecutive snapshots",
-    )
-    diff.add_argument(
-        "--count",
-        type=_positive_int,
-        default=None,
-        metavar="N",
-        help=(
-            "number of snapshots to take, which yields N-1 deltas; omit to "
-            "keep sampling until interrupted with Ctrl-C"
-        ),
-    )
-    _add_common_options(diff)
-    diff.set_defaults(handler=run_diff)
-
-
-def _add_doctor_parser(subcommands: argparse._SubParsersAction[Any]) -> None:
-    """Register the ``doctor`` subcommand."""
-    doctor = subcommands.add_parser(
-        "doctor",
-        help="explain whether attaching to a process would work",
-        description=(
-            "Run the attach preflight checks and report each one with its "
-            "cause, a command that confirms it and the fix. Nothing is "
-            "injected, so this is safe to run against a production process. "
-            "Without a PID only the checks describing this environment run."
-        ),
-    )
-    doctor.add_argument(
-        "pid",
-        nargs="?",
-        type=_positive_int,
-        default=None,
-        help="process id to diagnose; omit to check only this environment",
-    )
-    doctor.add_argument(
-        "--json",
-        dest="as_json",
-        action="store_true",
-        help="print the report as JSON instead of text",
-    )
-    doctor.add_argument(
-        "--pretty",
-        action="store_true",
-        help="indent the JSON; only meaningful together with --json",
-    )
-    doctor.set_defaults(handler=run_doctor)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -244,55 +83,118 @@ def build_parser() -> argparse.ArgumentParser:
         description=(
             "Structured JSON snapshots of running CPython 3.14+ processes via PEP 768."
         ),
+        epilog=format_exit_codes(),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument(
         "--version",
         action="version",
         version=f"{_PROGRAM_NAME} {__version__}",
     )
-    subcommands = parser.add_subparsers(dest="command", required=True)
-    _add_snap_parser(subcommands)
-    _add_eval_parser(subcommands)
-    _add_diff_parser(subcommands)
-    _add_doctor_parser(subcommands)
+    parser.add_argument(
+        "--timeout",
+        dest="global_timeout",
+        type=positive_float,
+        default=None,
+        metavar="SECONDS",
+        help=(
+            "hard budget for the whole probe, overriding the default of "
+            f"{DEFAULT_TIMEOUT_SECONDS:g}; the same option after the "
+            "subcommand wins over this one, and doctor ignores both because "
+            "it never attaches"
+        ),
+    )
+    parser.add_argument(
+        "--debug",
+        dest="is_debug",
+        action="store_true",
+        help=(
+            "re-raise an unexpected error instead of summarising it, so the "
+            f"traceback is printed; {_DEBUG_ENV_VAR}=1 does the same"
+        ),
+    )
+    add_subcommands(parser)
     return parser
 
 
-def _explain(error: ProbeError, pid: int | None) -> str:
-    """Render a probe failure, always pointing at ``doctor`` for the details.
+def _resolve_timeout(args: argparse.Namespace) -> None:
+    """Fold the global and per-subcommand ``--timeout`` into ``args.timeout``.
 
-    A failed probe is the moment the diagnostics are worth running, so every
-    error path names them -- appended here rather than in each message, so no
-    new failure mode can be added without the hint.
+    Both parsers write into the namespace, and the subcommand's default would
+    otherwise erase whatever was given before it, so both start at ``None``
+    and the more specific one is chosen here.
     """
-    if pid is None:
-        return str(error)
-    hint = _DOCTOR_HINT.format(pid=pid)
-    if hint in str(error):
-        return str(error)
-    return f"{error}; {hint}"
+    timeout = getattr(args, "timeout", None)
+    if timeout is None:
+        timeout = args.global_timeout
+    args.timeout = DEFAULT_TIMEOUT_SECONDS if timeout is None else timeout
+
+
+def _is_debug(args: argparse.Namespace) -> bool:
+    """Whether an unexpected error should surface as its own traceback."""
+    return bool(args.is_debug) or os.environ.get(_DEBUG_ENV_VAR, "") not in {"", "0"}
+
+
+def _abandon_stdout() -> None:
+    """Point stdout at the void after its reader went away.
+
+    Without this the interpreter flushes the buffer again on the way out and
+    prints its own ``BrokenPipeError`` after pidprobe has already handled it.
+    """
+    with contextlib.suppress(OSError, ValueError):
+        # The real descriptor is looked up first: when stdout is not backed by
+        # one there is nothing to redirect, and opening devnull would have
+        # leaked it.
+        target = sys.stdout.fileno()
+        devnull = os.open(os.devnull, os.O_WRONLY)
+        try:
+            os.dup2(devnull, target)
+        finally:
+            os.close(devnull)
+
+
+def _fail(message: str) -> None:
+    """Write one prefixed failure line to stderr."""
+    sys.stderr.write(f"{_PROGRAM_NAME}: {message}\n")
 
 
 def main(argv: Sequence[str] | None = None) -> int:
     """Run the ``pidprobe`` command-line interface.
 
+    Every expected failure is reported as a single ``pidprobe: ...`` line on
+    stderr and one of the documented exit codes; a traceback only ever
+    escapes under ``--debug``.
+
     Args:
         argv: Argument list to parse; defaults to :data:`sys.argv`.
 
     Returns:
-        The process exit code. Probe failures print their explanation to
-        stderr and return :data:`EXIT_PROBE_ERROR`; Ctrl-C ends the command
-        without a traceback and returns :data:`EXIT_INTERRUPTED`.
+        The process exit code; see :mod:`pidprobe._exits` for the table.
     """
     args = build_parser().parse_args(argv)
+    _resolve_timeout(args)
     handler: Callable[[argparse.Namespace], int] = args.handler
     try:
-        return handler(args)
+        code = handler(args)
+        # Flushed here rather than left to interpreter shutdown, so a reader
+        # that went away is reported by the handler below instead of by the
+        # interpreter's own "Exception ignored" notice after main returned.
+        sys.stdout.flush()
     except KeyboardInterrupt:
-        sys.stderr.write(f"{_PROGRAM_NAME}: interrupted\n")
+        _fail("interrupted")
         return EXIT_INTERRUPTED
+    except BrokenPipeError:
+        _abandon_stdout()
+        return EXIT_BROKEN_PIPE
     except ProbeError as exc:
-        sys.stderr.write(
-            f"{_PROGRAM_NAME}: {_explain(exc, getattr(args, 'pid', None))}\n"
-        )
-        return EXIT_PROBE_ERROR
+        pid = getattr(args, "pid", None) if args.command in _HINTING_COMMANDS else None
+        code, message = describe(exc, pid)
+        _fail(message)
+        return code
+    except Exception as exc:
+        if _is_debug(args):
+            raise
+        _fail(f"internal error: {type(exc).__name__}: {exc}")
+        _fail(_BUG_REPORT_HINT)
+        return EXIT_INTERNAL_ERROR
+    return code

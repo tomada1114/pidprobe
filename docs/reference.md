@@ -159,11 +159,57 @@ tooling.
     never executes an arbitrary program; it reports `target_python` as a
     warning instead.
 
-All four commands exit `0` on success, `1` when the probe fails or `doctor`
-found a blocking check (the reason is printed to stderr for `snap`, `eval` and
-`diff`, to stdout for `doctor`), `2` on invalid arguments, and `130` when
-Ctrl-C ended the command. A `snap`, `eval` or `diff` failure always names
-`pidprobe doctor <PID>` in its error, whatever went wrong.
+### Global options
+
+```bash
+pidprobe [--timeout SECONDS] [--debug] <command> ...
+```
+
+`--timeout` before the subcommand sets the hard probe budget for whichever
+command follows, overriding the built-in default of 5 seconds; the same option
+*after* the subcommand overrides it in turn, so the more specific one wins.
+`doctor` accepts it and ignores it, because it never attaches and so has
+nothing to budget.
+
+`--debug` re-raises an unexpected error instead of summarising it, printing
+the real traceback. `PIDPROBE_DEBUG=1` in the environment does the same, which
+is the version you want inside a script. It only affects *unexpected* errors:
+a diagnosed failure like a timeout is reported the same way either way.
+
+### Exit codes
+
+Every command reports its outcome with one of these, so a script can act on
+what went wrong without parsing the message:
+
+| Code | Meaning |
+| --- | --- |
+| `0` | Success |
+| `1` | The probe failed for a reason with no more specific code |
+| `2` | Invalid command line |
+| `3` | No such process |
+| `4` | Attaching to the target was refused |
+| `5` | The target did not answer within the timeout |
+| `6` | The injected code raised inside the target |
+| `7` | `doctor` found a check that blocks attaching |
+| `70` | pidprobe hit an unexpected error — a bug |
+| `130` | Interrupted with Ctrl-C |
+| `141` | The reader of stdout closed the pipe |
+
+`pidprobe --help` prints the same table. The failure is explained on stderr as
+a single `pidprobe: ...` line for `snap`, `eval` and `diff`; `doctor` prints
+its report to stdout whatever it says, because the report *is* its output, and
+only the exit code separates a clean environment from a blocked one.
+
+!!! note
+
+    `3` and `4` are worth telling apart: a vanished process is nothing to fix
+    and may be worth retrying, while a refused attach needs an operator. `7`
+    likewise means the diagnosis itself succeeded — distinct from `1`, which
+    means no diagnosis could be produced.
+
+A `snap`, `eval` or `diff` failure always names `pidprobe doctor <PID>` in its
+error, whatever went wrong. A `doctor` failure does not, since that is where
+you already are.
 
 ## Snapshot format
 
@@ -280,7 +326,7 @@ worked example; the contract is below. Publish an entry point in the
 
 ```toml
 [project.entry-points."pidprobe.collectors"]
-sqlalchemy = "pidprobe_sqlalchemy:COLLECTOR"
+redis = "my_package.collectors:REDIS"
 ```
 
 The entry point resolves either to a collector or to a zero-argument callable
@@ -289,14 +335,15 @@ returning one:
 ```python
 from pidprobe import Collector
 
-COLLECTOR = Collector(
-    name="sqlalchemy",
+REDIS = Collector(
+    name="redis",
     source="""
-import sqlalchemy
+import sys
 
-data = {"version": sqlalchemy.__version__}
+module = sys.modules.get("redis")
+data = {"available": module is not None}
 """,
-    description="SQLAlchemy engine and pool state",
+    description="whether the target has Redis loaded",
 )
 ```
 
@@ -305,6 +352,15 @@ data = {"version": sqlalchemy.__version__}
 published as the top-level section named after `name` — next to `stacks`,
 `objects`, `gc` and `fds`, and reported in `meta.collectors` like any built-in
 one. The JSON Schema allows unknown top-level keys for exactly this reason.
+
+!!! warning
+
+    `source` must not `import` the library it reports on. The import would
+    run inside the target and load a package that process never asked for,
+    changing what you were trying to observe. Look the module up in
+    `sys.modules` instead, as above, and report `"available": false` when it
+    is not there. [Writing a collector plugin](plugins.md) covers the rest of
+    the rules.
 
 `Collector` is a convenience, not a requirement: `CollectorSpec` is the typed
 protocol discovery accepts, so any object carrying `name`, `source` and

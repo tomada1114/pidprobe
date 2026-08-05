@@ -7,6 +7,7 @@ import pytest
 from pidprobe._errors import (
     AttachError,
     ChannelError,
+    NoSuchProcessError,
     ProbeError,
     ProbeTimeoutError,
 )
@@ -32,6 +33,30 @@ def test_attach_error_from_cause_explains_the_likely_remedy(
     assert expected_hint in str(error)
     assert "cannot attach to pid 4242" in str(error)
     assert type(cause).__name__ in str(error)
+
+
+def test_a_vanished_target_gets_its_own_error_type() -> None:
+    error = AttachError.from_cause(4242, ProcessLookupError(3, "gone"))
+
+    # Its own type, because it is its own outcome: nothing needs fixing, the
+    # process is simply not there, and the CLI reports it with its own code.
+    assert isinstance(error, NoSuchProcessError)
+    assert error.pid == 4242
+
+
+@pytest.mark.parametrize(
+    "cause",
+    [
+        pytest.param(PermissionError(1, "denied"), id="permission"),
+        pytest.param(RuntimeError("nope"), id="runtime"),
+        pytest.param(OSError(5, "io"), id="other-oserror"),
+    ],
+)
+def test_a_refused_attach_is_not_a_vanished_target(cause: BaseException) -> None:
+    error = AttachError.from_cause(4242, cause)
+
+    assert isinstance(error, AttachError)
+    assert not isinstance(error, NoSuchProcessError)
 
 
 def test_attach_error_without_cause_keeps_the_hint() -> None:
