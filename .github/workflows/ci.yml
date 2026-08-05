@@ -61,8 +61,27 @@ jobs:
       - name: Install dependencies
         run: uv sync --group dev --locked
 
+      # Unprivileged, like a user's own shell. On Linux this already covers the
+      # integration tests; on macOS they skip themselves, because task_for_pid
+      # is denied to non-root and no `-m integration` run can change that.
       - name: Run tests
+        env:
+          # Linux has nothing standing between the prober and the target here,
+          # so a skipped integration test means the coverage silently vanished.
+          PIDPROBE_REQUIRE_INTEGRATION: ${{ runner.os == 'Linux' && '1' || '' }}
         run: uv run pytest --cov=pidprobe --cov-branch --cov-report=term-missing:skip-covered --cov-fail-under=80 --cov-report=xml
+
+      # macOS hands out task_for_pid only to root, so the 25 integration tests
+      # skipped above are re-run here under sudo -- the same `sudo pidprobe`
+      # the doctor tells macOS users to run. Only this step is privileged, so
+      # the unprivileged path above stays the one the matrix mostly exercises.
+      # -B and -p no:cacheprovider keep root from leaving __pycache__ and
+      # .pytest_cache entries the runner user could not overwrite afterwards.
+      - name: Run integration tests as root (macOS)
+        if: runner.os == 'macOS'
+        run: >-
+          sudo --non-interactive env PIDPROBE_REQUIRE_INTEGRATION=1
+          .venv/bin/python -B -m pytest -m integration -p no:cacheprovider -rs
 
       - name: Upload coverage
         if: matrix.python-version == '3.14' && matrix.os == 'ubuntu-latest'
