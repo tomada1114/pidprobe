@@ -58,8 +58,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   invalid command line, `3` no such process, `4` attach refused, `5` timeout,
   `6` the injected code raised inside the target, `7` `doctor` found a
   blocking check, `70` a bug in pidprobe, `130` Ctrl-C, `141` a closed stdout
-  pipe. `pidprobe --help` prints the table, and README and the reference
-  document it.
+  pipe. `pidprobe --help` prints the table and the API reference documents it.
 - `NoSuchProcessError`, the `AttachError` subclass raised when the pid does
   not exist, so "the process is gone" can be told from "attaching was
   refused" both in Python and in the exit code.
@@ -84,8 +83,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `scripts/record_demo.sh` drives the deadlock half non-interactively for
   recording and for CI. The demo's dependencies stay out of `pyproject.toml`:
   pidprobe still has no runtime dependencies.
+- `docs/assets/demo.gif`, recorded from `scripts/record_demo.sh` against the
+  demo image: a hung request, then `pidprobe snap | jq` naming the two
+  deadlocked threads and the connection pool they stranded.
 
 ### Changed
+
+- The README is rewritten as a front door rather than a second copy of the
+  documentation. It now opens with the demo GIF, a one-line pitch and a
+  two-line quickstart, then leads with what pidprobe *cannot* do: an honest
+  comparison against py-spy and an explicit constraints section covering the
+  matching-`major.minor` CPython 3.14+ requirement, remote debugging being
+  compiled in and enabled, the OS attach permissions, and the safe eval point
+  a target blocked in a C extension never reaches. The per-feature walkthroughs
+  it used to carry, and the leftover project-template rationale, are dropped in
+  favour of links to the pages that own them.
 
 - **Breaking:** `pidprobe doctor` now exits `7` rather than `1` when a check
   blocks attaching. `1` no longer means "the diagnosis says no"; it means the
