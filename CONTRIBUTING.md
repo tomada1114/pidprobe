@@ -159,6 +159,81 @@ GitHub's auto-generated release notes (via `.github/release.yml` categories)
 are supplementary — useful for a quick PR-by-PR diff, but `CHANGELOG.md` is
 what users should read to understand what changed in a release.
 
+## Releasing
+
+Releases are cut by pushing a `v*` tag. `.github/workflows/release.yml` then
+tests, builds the sdist and wheel, smoke-tests the wheel, attests its build
+provenance, publishes to PyPI and creates the GitHub Release. Nothing is
+uploaded by hand, and there is no PyPI API token anywhere in this repository:
+the `publish` job authenticates to PyPI with an OIDC identity through
+[trusted publishing](https://docs.pypi.org/trusted-publishers/).
+
+### One-time: register the trusted publisher on PyPI
+
+**Do this before the first tag push, not after.** With no publisher
+registered the workflow still runs, tests and builds, and then fails at
+`publish` when PyPI refuses the OIDC token — leaving a tag behind with
+nothing published and no GitHub Release, which has to be deleted before you
+can tag the same version again.
+
+Sign in to PyPI as an owner of the project and add a GitHub publisher with
+exactly these values — they must match the workflow, or PyPI rejects the
+token exchange:
+
+| Field | Value |
+| --- | --- |
+| Owner | `tomada1114` |
+| Repository name | `pidprobe` |
+| Workflow name | `release.yml` |
+| Environment name | `release` |
+
+Where to enter them depends on whether the project exists on PyPI yet:
+
+- **It exists** (as it does now — `pidprobe` 0.0.1 is on PyPI): *Manage
+  project* → *Publishing* → *Add a new publisher*.
+- **It does not exist**: *Your account* → *Publishing* → add a
+  [pending publisher](https://docs.pypi.org/trusted-publishers/creating-a-project-through-oidc/),
+  which is what lets the very first upload create the project. A publisher
+  cannot be attached to a project that is not there.
+
+The `release` environment named above is a GitHub Actions environment. It is
+where a required-reviewer rule would go if the release ever needs a manual
+approval gate.
+
+### Cutting a release
+
+1. Land a release-prep pull request that sets `project.version` in
+   `pyproject.toml` to the new version and turns the `[Unreleased]` section
+   of `CHANGELOG.md` into a dated section for it, leaving an empty
+   `[Unreleased]` behind. The tag and `project.version` are checked against
+   each other by the workflow, so a mismatch stops the release before it
+   builds anything.
+2. Wait for CI to be green on `main`.
+3. Tag the merge commit and push the tag:
+
+   ```bash
+   git checkout main && git pull
+   git tag -a v0.1.0 -m "pidprobe 0.1.0"
+   git push origin v0.1.0
+   ```
+
+4. Watch the run: `gh run list --workflow release.yml`, then
+   `gh run watch <run-id>`.
+5. Confirm the published artifact from outside this checkout, so nothing local
+   can stand in for it:
+
+   ```bash
+   cd "$(mktemp -d)"
+   uvx --python 3.14 pidprobe --help
+   ```
+
+If the run fails before the `publish` job, delete the tag both places
+(`git tag -d v0.1.0 && git push origin :refs/tags/v0.1.0`), fix the problem
+and tag again. Once
+`publish` has succeeded the version is on PyPI for good — PyPI does not allow
+re-uploading a version, even a deleted one — so the fix for a bad release is
+another release.
+
 ## Getting Help
 
 If something is unclear, open an issue or start a discussion. We're happy to
