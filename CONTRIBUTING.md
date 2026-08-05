@@ -196,9 +196,12 @@ Where to enter them depends on whether the project exists on PyPI yet:
   which is what lets the very first upload create the project. A publisher
   cannot be attached to a project that is not there.
 
-The `release` environment named above is a GitHub Actions environment. It is
-where a required-reviewer rule would go if the release ever needs a manual
-approval gate.
+The `release` environment named above is the GitHub Actions environment the
+`publish` job declares. Nothing has to be created on the GitHub side — a job
+referencing an environment creates it — but PyPI compares the name against
+the OIDC token's `environment` claim, so it has to be spelled the same in both
+places. The environment is also where a required-reviewer rule would go if the
+release ever needs a manual approval gate.
 
 ### Cutting a release
 
