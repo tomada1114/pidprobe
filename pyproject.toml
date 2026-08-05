@@ -21,6 +21,9 @@ classifiers = [
     "Typing :: Typed",
 ]
 
+[project.scripts]
+pidprobe = "pidprobe.cli:main"
+
 [project.urls]
 Homepage = "https://github.com/tomada1114/pidprobe"
 Documentation = "https://tomada1114.github.io/pidprobe"
@@ -29,7 +32,14 @@ Issues = "https://github.com/tomada1114/pidprobe/issues"
 Changelog = "https://github.com/tomada1114/pidprobe/blob/main/CHANGELOG.md"
 
 [dependency-groups]
-dev = ["mypy>=2.1.0", "pre-commit>=4.6.0", "pytest>=8.0", "pytest-cov>=7.1.0", "ruff>=0.11"]
+dev = [
+    "fastjsonschema>=2.21",
+    "mypy>=2.1.0",
+    "pre-commit>=4.6.0",
+    "pytest>=8.0",
+    "pytest-cov>=7.1.0",
+    "ruff>=0.11",
+]
 docs = ["mkdocs-material>=9.7.6", "mkdocstrings[python]>=1.0.4"]
 
 # --------------------------------------------------------------------------- #
@@ -155,6 +165,12 @@ enable_error_code = ["ignore-without-code", "redundant-cast", "truthy-bool"]
 module = "tests.*"
 disallow_untyped_defs = false
 disallow_untyped_calls = false
+
+# fastjsonschema ships no py.typed marker; it is only used by the tests that
+# validate snapshots against the published JSON Schema.
+[[tool.mypy.overrides]]
+module = "fastjsonschema.*"
+ignore_missing_imports = true
 
 # --------------------------------------------------------------------------- #
 #  pytest

@@ -23,7 +23,18 @@ class TestAdd:
 
 class TestPackageMetadata:
     def test_public_exports(self):
-        assert set(__all__) == {"__version__", "add"}
+        assert set(__all__) == {
+            "SCHEMA_VERSION",
+            "AttachError",
+            "ChannelError",
+            "ProbeError",
+            "ProbeTimeoutError",
+            "TargetError",
+            "__version__",
+            "add",
+            "snapshot_schema",
+            "take_snapshot",
+        }
 
     def test_version_matches_installed_metadata(self):
         assert __version__ == version("pidprobe")

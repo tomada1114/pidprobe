@@ -1,0 +1,258 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://tomada1114.github.io/pidprobe/schema/snapshot-1.0.json",
+  "title": "pidprobe snapshot",
+  "description": "One JSON document produced by `pidprobe snap <PID>`. Every collector contributes one top-level section named after it; a section is null when that collector failed, and meta.collectors then carries the reason. Unknown top-level keys are allowed so third-party collectors can add sections.",
+  "type": "object",
+  "required": ["schema_version", "meta", "stacks", "objects", "gc", "fds"],
+  "properties": {
+    "schema_version": {
+      "description": "Version of this output format; the minor part is bumped for additive changes.",
+      "const": "1.0"
+    },
+    "meta": { "$ref": "#/$defs/meta" },
+    "stacks": {
+      "anyOf": [{ "$ref": "#/$defs/stacks" }, { "type": "null" }]
+    },
+    "objects": {
+      "anyOf": [{ "$ref": "#/$defs/objects" }, { "type": "null" }]
+    },
+    "gc": {
+      "anyOf": [{ "$ref": "#/$defs/gc" }, { "type": "null" }]
+    },
+    "fds": {
+      "anyOf": [{ "$ref": "#/$defs/fds" }, { "type": "null" }]
+    }
+  },
+  "$defs": {
+    "interpreter": {
+      "type": "object",
+      "required": ["python_version", "implementation", "platform", "executable"],
+      "properties": {
+        "python_version": { "type": "string" },
+        "implementation": { "type": "string" },
+        "platform": { "type": "string" },
+        "executable": { "type": "string" },
+        "pid": { "type": "integer" }
+      }
+    },
+    "error": {
+      "type": "object",
+      "required": ["type", "message", "traceback"],
+      "properties": {
+        "type": { "type": "string" },
+        "message": { "type": "string" },
+        "traceback": { "type": "string" }
+      }
+    },
+    "collector_report": {
+      "type": "object",
+      "required": ["name", "status", "duration_ms", "error"],
+      "properties": {
+        "name": { "type": "string" },
+        "status": { "enum": ["ok", "error"] },
+        "duration_ms": { "type": "number", "minimum": 0 },
+        "error": {
+          "anyOf": [{ "$ref": "#/$defs/error" }, { "type": "null" }]
+        }
+      }
+    },
+    "meta": {
+      "type": "object",
+      "required": [
+        "pid",
+        "captured_at",
+        "pidprobe_version",
+        "prober",
+        "target",
+        "stop_duration_ms",
+        "elapsed_ms",
+        "collectors"
+      ],
+      "properties": {
+        "pid": { "type": "integer", "minimum": 1 },
+        "captured_at": {
+          "description": "UTC timestamp in ISO 8601 form, taken by the prober.",
+          "type": "string"
+        },
+        "pidprobe_version": { "type": "string" },
+        "prober": { "$ref": "#/$defs/interpreter" },
+        "target": { "$ref": "#/$defs/interpreter" },
+        "stop_duration_ms": {
+          "description": "Time the target spent running the collectors, measured inside the target.",
+          "type": "number",
+          "minimum": 0
+        },
+        "elapsed_ms": {
+          "description": "Wall-clock time of the whole probe, measured by the prober.",
+          "type": "number",
+          "minimum": 0
+        },
+        "collectors": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/collector_report" }
+        }
+      }
+    },
+    "frame": {
+      "type": "object",
+      "required": ["file", "line", "function", "locals"],
+      "properties": {
+        "file": { "type": "string" },
+        "line": { "type": "integer" },
+        "function": { "type": "string" },
+        "locals": {
+          "description": "Bounded repr of each local variable, or null when the frame refused to expose them.",
+          "anyOf": [
+            { "type": "object", "additionalProperties": { "type": "string" } },
+            { "type": "null" }
+          ]
+        }
+      }
+    },
+    "thread": {
+      "type": "object",
+      "required": [
+        "thread_id",
+        "name",
+        "daemon",
+        "is_main",
+        "frames",
+        "frames_truncated"
+      ],
+      "properties": {
+        "thread_id": { "type": "integer" },
+        "name": { "type": ["string", "null"] },
+        "daemon": { "type": ["boolean", "null"] },
+        "is_main": { "type": "boolean" },
+        "frames": {
+          "description": "Innermost frame first.",
+          "type": "array",
+          "items": { "$ref": "#/$defs/frame" }
+        },
+        "frames_truncated": { "type": "boolean" }
+      }
+    },
+    "stacks": {
+      "type": "object",
+      "required": ["thread_count", "max_frame_depth", "threads"],
+      "properties": {
+        "thread_count": { "type": "integer", "minimum": 0 },
+        "max_frame_depth": { "type": "integer", "minimum": 1 },
+        "threads": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/thread" }
+        }
+      }
+    },
+    "objects": {
+      "description": "Only GC-tracked containers are visible to the target; atomic values such as int and str are not counted.",
+      "type": "object",
+      "required": ["top_n", "total_tracked", "distinct_types", "top"],
+      "properties": {
+        "top_n": { "type": "integer", "minimum": 1 },
+        "total_tracked": { "type": "integer", "minimum": 0 },
+        "distinct_types": { "type": "integer", "minimum": 0 },
+        "top": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["type", "count"],
+            "properties": {
+              "type": { "type": "string" },
+              "count": { "type": "integer", "minimum": 0 }
+            }
+          }
+        }
+      }
+    },
+    "gc": {
+      "type": "object",
+      "required": [
+        "enabled",
+        "counts",
+        "thresholds",
+        "generations",
+        "garbage_count",
+        "freeze_count"
+      ],
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "counts": { "type": "array", "items": { "type": "integer" } },
+        "thresholds": { "type": "array", "items": { "type": "integer" } },
+        "generations": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["generation"],
+            "properties": {
+              "generation": { "type": "integer", "minimum": 0 },
+              "collections": { "type": "integer" },
+              "collected": { "type": "integer" },
+              "uncollectable": { "type": "integer" },
+              "count": { "type": "integer" },
+              "threshold": { "type": "integer" }
+            }
+          }
+        },
+        "garbage_count": { "type": "integer", "minimum": 0 },
+        "freeze_count": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "descriptor": {
+      "type": "object",
+      "required": ["fd", "kind", "target", "inode", "is_tty"],
+      "properties": {
+        "fd": { "type": "integer", "minimum": 0 },
+        "kind": {
+          "enum": [
+            "socket",
+            "fifo",
+            "file",
+            "directory",
+            "char",
+            "block",
+            "symlink",
+            "unknown"
+          ]
+        },
+        "target": { "type": ["string", "null"] },
+        "inode": { "type": "integer" },
+        "is_tty": { "type": "boolean" },
+        "size": { "type": "integer" },
+        "socket": {
+          "description": "Address details, or null where the family cannot be detected safely (anything but Linux).",
+          "anyOf": [
+            {
+              "type": "object",
+              "required": ["family", "type", "laddr", "raddr"],
+              "properties": {
+                "family": { "type": "string" },
+                "type": { "type": "string" },
+                "laddr": {},
+                "raddr": {}
+              }
+            },
+            { "type": "null" }
+          ]
+        }
+      }
+    },
+    "fds": {
+      "type": "object",
+      "required": ["supported", "source", "count", "descriptors"],
+      "properties": {
+        "supported": {
+          "description": "False when the platform exposes no readable fd directory.",
+          "type": "boolean"
+        },
+        "source": { "type": ["string", "null"] },
+        "count": { "type": "integer", "minimum": 0 },
+        "descriptors": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/descriptor" }
+        }
+      }
+    }
+  }
+}
