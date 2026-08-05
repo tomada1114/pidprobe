@@ -6,7 +6,8 @@
 pidprobe snap <PID> [--pretty] [--timeout SECONDS] [--no-mask]
 ```
 
-`snap` injects the built-in collectors into a running CPython 3.14+ process
+`snap` injects the built-in collectors -- plus every installed
+[collector plugin](#collector-plugins) -- into a running CPython 3.14+ process
 and prints one JSON snapshot. The default output is a single compact line so
 it can be piped straight into `jq`; `--pretty` indents it instead.
 `--timeout` (default: 5 seconds) is a hard budget for the whole probe.
