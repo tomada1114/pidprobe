@@ -67,8 +67,8 @@ $ pidprobe doctor 12345
 Every check that fails or warns carries a cause, a command you can run to
 confirm it yourself, and the concrete fix — never a bare "Permission denied".
 The `PID` is optional: without one, only the checks describing your own
-environment run. `--json` prints the same report for tooling, and any `snap`
-or `eval` failure points you here.
+environment run. `--json` prints the same report for tooling, and any `snap`,
+`eval` or `diff` failure points you here.
 
 ```python
 from pidprobe import diagnose
@@ -97,6 +97,29 @@ never as a hang.
 from pidprobe import evaluate_in_target
 
 print(evaluate_in_target(12345, "len(queue)")["result"])
+```
+
+## Watching a leak grow
+
+A single snapshot cannot tell you what is *growing*. `diff` samples the same
+process repeatedly and prints only what moved between two consecutive samples,
+one JSON line per delta, as soon as each one is ready:
+
+```console
+$ pidprobe diff 12345 --interval 5 --count 3
+{"schema_version":"1.0","meta":{"pid":12345,"from":"...","to":"...","interval_ms":5004.1},"objects":{"top_n":50,"total_tracked":{"before":91204,"after":93871,"delta":2667},...,"types":[{"type":"app.models.Session","before":1204,"after":3861,"delta":2657},...]},"gc":{...},"fds":{"count":{"before":31,"after":31,"delta":0}}}
+```
+
+Types are ranked by growth, so a leak sorts itself to the top. `--count N`
+takes N snapshots and therefore prints N-1 deltas; leave it out to keep
+sampling until you press Ctrl-C. Only the `objects`, `gc` and `fds` collectors
+run, so a delta stops the target for less time than a full `snap` would.
+
+```python
+from pidprobe import iter_snapshot_deltas
+
+for delta in iter_snapshot_deltas(12345, interval_seconds=5, count=3):
+    print(delta["objects"]["types"][:3])
 ```
 
 ## Secret masking

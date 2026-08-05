@@ -5,6 +5,7 @@ from __future__ import annotations
 from importlib.metadata import PackageNotFoundError, version
 
 from ._diagnosis import Check, CheckStatus, Diagnosis
+from ._diff import diff_snapshots, iter_snapshot_deltas
 from ._doctor import diagnose
 from ._errors import (
     AttachError,
@@ -48,8 +49,10 @@ __all__ = [
     "add",
     "available_collectors",
     "diagnose",
+    "diff_snapshots",
     "discover_collectors",
     "evaluate_in_target",
+    "iter_snapshot_deltas",
     "snapshot_schema",
     "take_snapshot",
 ]

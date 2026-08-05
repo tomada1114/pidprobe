@@ -64,6 +64,40 @@ elements per container, 200 characters per `repr()` and 2000 characters in
 total -- with what was left out marked as `...` or `...<truncated>`.
 
 ```bash
+pidprobe diff <PID> --interval SECONDS [--count N] [--pretty] [--timeout SECONDS]
+```
+
+`diff` samples one process over and over and prints only what moved between
+two consecutive samples, which is what finds a leak: a growing type is
+invisible in any single snapshot and tedious to spot across two full ones.
+
+```console
+$ pidprobe diff 12345 --interval 5 --count 3 | jq -c '.objects.types[0]'
+{"type":"app.models.Session","before":1204,"after":3861,"delta":2657}
+{"type":"app.models.Session","before":3861,"after":6498,"delta":2637}
+```
+
+Each delta is printed as one JSON object on its own line -- **JSON Lines** --
+and flushed as soon as it is computed, so the stream can be piped into `jq`
+or a log while it is still running. `--pretty` indents each delta instead,
+which is for reading: the output is then no longer one delta per line.
+
+`--count N` takes `N` snapshots and therefore prints `N - 1` deltas, since a
+delta needs a pair; `--count 1` prints nothing. Without `--count` the command
+samples until it is interrupted with Ctrl-C, which ends it cleanly with exit
+code `130` and no traceback. `--interval` is measured between the *starts* of
+two samples, so the time a probe itself costs is taken off the wait rather
+than added to it.
+
+!!! note
+
+    Only the `objects`, `gc` and `fds` collectors run -- the three sections a
+    delta is defined for. Stacks and [plugin](#collector-plugins) sections are
+    not sampled at all, so `diff` stops the target for less time per sample
+    than `snap` does, and `--no-mask` has nothing to apply to: a delta reports
+    counters, never values read out of the target.
+
+```bash
 pidprobe doctor [PID] [--json] [--pretty]
 ```
 
@@ -125,11 +159,11 @@ tooling.
     never executes an arbitrary program; it reports `target_python` as a
     warning instead.
 
-All three commands exit `0` on success, `1` when the probe fails or `doctor`
-found a blocking check (the reason is printed to stderr for `snap` and `eval`,
-to stdout for `doctor`), and `2` on invalid arguments. A `snap` or `eval`
-failure always names `pidprobe doctor <PID>` in its error, whatever went
-wrong.
+All four commands exit `0` on success, `1` when the probe fails or `doctor`
+found a blocking check (the reason is printed to stderr for `snap`, `eval` and
+`diff`, to stdout for `doctor`), `2` on invalid arguments, and `130` when
+Ctrl-C ended the command. A `snap`, `eval` or `diff` failure always names
+`pidprobe doctor <PID>` in its error, whatever went wrong.
 
 ## Snapshot format
 
@@ -164,6 +198,77 @@ schema = snapshot_schema()
 
     `objects` only counts containers the garbage collector tracks. Atomic
     values such as `int` and `str` are invisible to it and are not counted.
+
+## Delta format
+
+`pidprobe diff` prints a different document from `snap`: not a snapshot, but
+the difference between two of them. Every number that moved is reported as a
+`{"before", "after", "delta"}` object, where `delta` is `after - before`.
+
+```json
+{
+  "schema_version": "1.0",
+  "meta": {
+    "pid": 12345,
+    "from": "2026-08-05T14:51:08.863505Z",
+    "to": "2026-08-05T14:51:13.867786Z",
+    "interval_ms": 5004.281
+  },
+  "objects": {
+    "top_n": 50,
+    "total_tracked": { "before": 91204, "after": 93871, "delta": 2667 },
+    "distinct_types": { "before": 412, "after": 413, "delta": 1 },
+    "types": [
+      { "type": "app.models.Session", "before": 1204, "after": 3861, "delta": 2657 },
+      { "type": "dict", "before": 30112, "after": 30121, "delta": 9 },
+      { "type": "tuple", "before": 18004, "after": 17998, "delta": -6 }
+    ]
+  },
+  "gc": {
+    "generations": [
+      {
+        "generation": 0,
+        "collections": { "before": 14, "after": 19, "delta": 5 },
+        "collected": { "before": 179, "after": 233, "delta": 54 },
+        "uncollectable": { "before": 0, "after": 0, "delta": 0 },
+        "count": { "before": 7, "after": 925, "delta": 918 }
+      }
+    ],
+    "garbage_count": { "before": 0, "after": 0, "delta": 0 },
+    "freeze_count": { "before": 0, "after": 0, "delta": 0 }
+  },
+  "fds": { "count": { "before": 31, "after": 31, "delta": 0 } }
+}
+```
+
+| Key | Contents |
+| --- | --- |
+| `meta` | The pid, the capture timestamps of the two snapshots (`from`, `to`) and the milliseconds actually measured between them |
+| `objects.types` | Every type whose count moved, ranked by `delta` from fastest-growing to fastest-shrinking, ties broken by type name |
+| `objects.total_tracked`, `objects.distinct_types` | How the totals of the `objects` section moved |
+| `gc.generations` | One row per generation both snapshots reported, paired by `generation` index, with every statistic diffed |
+| `gc.garbage_count`, `gc.freeze_count` | How the two `gc` totals moved |
+| `fds.count` | How many file descriptors the target gained or lost |
+
+A type is left out of `objects.types` when its count did not move -- a delta
+reports what changed, and most of the hundreds of types a process holds did
+not. The `gc` and `fds` numbers are reported either way: their shape is fixed
+and small, and "the collector never ran" is worth telling apart from "nothing
+happened".
+
+!!! warning
+
+    `before` or `after` is `null` when the type was outside that snapshot's
+    `top_n` ranking, which is **not** the same as having no instances. The
+    unknown side is then counted as zero, so `delta` bounds the change in the
+    direction it moved instead of stating it exactly.
+
+!!! note
+
+    A section is `null` when either snapshot lacked it, which is what a
+    collector that failed inside the target leaves behind. The
+    `schema_version` tracks pidprobe's output format as a whole; a delta is
+    not a snapshot and is not described by `snapshot.schema.json`.
 
 ## Collector plugins
 

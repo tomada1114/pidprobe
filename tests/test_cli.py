@@ -10,10 +10,16 @@ from typing import Any
 import pytest
 
 from pidprobe import __version__, available_collectors
-from pidprobe import cli as cli_module
+from pidprobe import _commands as commands_module
 from pidprobe._diagnosis import Check, CheckStatus, Diagnosis
 from pidprobe._errors import AttachError, ChannelError, ProbeTimeoutError
-from pidprobe.cli import EXIT_OK, EXIT_PROBE_ERROR, build_parser, main
+from pidprobe.cli import (
+    EXIT_INTERRUPTED,
+    EXIT_OK,
+    EXIT_PROBE_ERROR,
+    build_parser,
+    main,
+)
 from pidprobe.collectors import STACKS_COLLECTOR
 from pidprobe.collectors._stacks import build_stacks_collector
 
@@ -36,7 +42,7 @@ def fake_snapshot(monkeypatch):
         calls.update(pid=pid, **kwargs)
         return SNAPSHOT
 
-    monkeypatch.setattr(cli_module, "take_snapshot", fake_take_snapshot)
+    monkeypatch.setattr(commands_module, "take_snapshot", fake_take_snapshot)
     return calls
 
 
@@ -47,7 +53,7 @@ def failing_snapshot(monkeypatch):
     def fake_take_snapshot(pid: int, **kwargs: Any) -> dict[str, Any]:
         raise ProbeTimeoutError(5.0, pid)
 
-    monkeypatch.setattr(cli_module, "take_snapshot", fake_take_snapshot)
+    monkeypatch.setattr(commands_module, "take_snapshot", fake_take_snapshot)
 
 
 class TestSnapOutput:
@@ -120,7 +126,7 @@ def fake_evaluation(monkeypatch):
         calls.update(pid=pid, expression=expression, **kwargs)
         return EVALUATION
 
-    monkeypatch.setattr(cli_module, "evaluate_in_target", fake_evaluate_in_target)
+    monkeypatch.setattr(commands_module, "evaluate_in_target", fake_evaluate_in_target)
     return calls
 
 
@@ -163,7 +169,7 @@ class TestEval:
         def failing(pid: int, expression: str, **kwargs: Any) -> dict[str, Any]:
             raise ProbeTimeoutError(5.0, pid)
 
-        monkeypatch.setattr(cli_module, "evaluate_in_target", failing)
+        monkeypatch.setattr(commands_module, "evaluate_in_target", failing)
 
         exit_code = main(["eval", "4321", "1 + 1"])
 
@@ -171,6 +177,113 @@ class TestEval:
         assert exit_code == EXIT_PROBE_ERROR
         assert captured.out == ""
         assert captured.err.startswith("pidprobe: ")
+
+
+DELTAS = [
+    {
+        "schema_version": "1.0",
+        "meta": {"pid": 4321, "interval_ms": 1000.0},
+        "objects": {"types": [{"type": "Leak", "before": 1, "after": 9, "delta": 8}]},
+    },
+    {
+        "schema_version": "1.0",
+        "meta": {"pid": 4321, "interval_ms": 1000.0},
+        "objects": {"types": []},
+    },
+]
+
+
+@pytest.fixture
+def fake_deltas(monkeypatch):
+    """Make ``diff`` yield fixed deltas and record how it was asked to sample."""
+    calls: dict[str, Any] = {}
+
+    def fake_iter_snapshot_deltas(pid: int, **kwargs: Any) -> Any:
+        calls.update(pid=pid, **kwargs)
+        yield from DELTAS
+
+    monkeypatch.setattr(
+        commands_module,
+        "iter_snapshot_deltas",
+        fake_iter_snapshot_deltas,
+    )
+    return calls
+
+
+class TestDiff:
+    @pytest.mark.usefixtures("fake_deltas")
+    def test_every_delta_is_printed_as_its_own_json_line(self, capsys):
+        exit_code = main(["diff", "4321", "--interval", "0.01", "--count", "3"])
+
+        out = capsys.readouterr().out
+        assert exit_code == EXIT_OK
+        # JSON Lines: one delta per line, so the stream can be consumed as it
+        # arrives instead of only after the last sample.
+        assert [json.loads(line) for line in out.splitlines()] == DELTAS
+
+    @pytest.mark.usefixtures("fake_deltas")
+    def test_pretty_output_indents_each_delta(self, capsys):
+        main(["diff", "4321", "--interval", "0.01", "--pretty"])
+
+        out = capsys.readouterr().out
+        assert '\n  "meta": {' in out
+        assert out.count('"schema_version"') == len(DELTAS)
+
+    def test_interval_count_and_timeout_reach_the_sampler(self, fake_deltas):
+        main(["diff", "4321", "--interval", "2.5", "--count", "7", "--timeout", "0.5"])
+
+        assert fake_deltas["pid"] == 4321
+        assert fake_deltas["interval_seconds"] == pytest.approx(2.5)
+        assert fake_deltas["count"] == 7
+        assert fake_deltas["timeout_seconds"] == pytest.approx(0.5)
+
+    def test_without_a_count_the_sampler_is_left_unbounded(self, fake_deltas):
+        main(["diff", "4321", "--interval", "0.01"])
+
+        assert fake_deltas["count"] is None
+        assert fake_deltas["timeout_seconds"] == pytest.approx(5.0)
+
+    def test_ctrl_c_keeps_the_deltas_already_printed_and_exits_cleanly(
+        self,
+        monkeypatch,
+        capsys,
+    ):
+        def interrupted(pid: int, **kwargs: Any) -> Any:
+            yield DELTAS[0]
+            raise KeyboardInterrupt
+
+        monkeypatch.setattr(commands_module, "iter_snapshot_deltas", interrupted)
+
+        exit_code = main(["diff", "4321", "--interval", "0.01"])
+
+        captured = capsys.readouterr()
+        assert exit_code == EXIT_INTERRUPTED
+        assert json.loads(captured.out) == DELTAS[0]
+        assert captured.err == "pidprobe: interrupted\n"
+
+    def test_a_probe_failing_mid_series_points_at_doctor(self, monkeypatch, capsys):
+        def failing(pid: int, **kwargs: Any) -> Any:
+            yield DELTAS[0]
+            raise ProbeTimeoutError(5.0, pid)
+
+        monkeypatch.setattr(commands_module, "iter_snapshot_deltas", failing)
+
+        exit_code = main(["diff", "4321", "--interval", "0.01"])
+
+        captured = capsys.readouterr()
+        assert exit_code == EXIT_PROBE_ERROR
+        # A target that stops answering ends the series; what it already said
+        # stays on stdout and the reason goes to stderr.
+        assert json.loads(captured.out) == DELTAS[0]
+        assert "pidprobe doctor 4321" in captured.err
+
+    def test_diff_is_dispatched_through_its_own_handler(self):
+        parser = build_parser()
+        diff_args = parser.parse_args(["diff", "4321", "--interval", "1"])
+
+        assert diff_args.handler is not parser.parse_args(["snap", "1"]).handler
+        assert diff_args.count is None
+        assert diff_args.pretty is False
 
 
 HEALTHY = Diagnosis(
@@ -202,7 +315,7 @@ def fake_diagnosis(monkeypatch):
         result: Diagnosis = calls["result"]
         return result
 
-    monkeypatch.setattr(cli_module, "diagnose", fake_diagnose)
+    monkeypatch.setattr(commands_module, "diagnose", fake_diagnose)
     return calls
 
 
@@ -296,8 +409,8 @@ class TestErrorHandling:
         def failing(*_args: Any, **_kwargs: Any) -> dict[str, Any]:
             raise error
 
-        monkeypatch.setattr(cli_module, "take_snapshot", failing)
-        monkeypatch.setattr(cli_module, "evaluate_in_target", failing)
+        monkeypatch.setattr(commands_module, "take_snapshot", failing)
+        monkeypatch.setattr(commands_module, "evaluate_in_target", failing)
 
         exit_code = main(argv)
 
@@ -310,7 +423,7 @@ class TestErrorHandling:
             message = "no channel"
             raise ChannelError(message)
 
-        monkeypatch.setattr(cli_module, "diagnose", failing)
+        monkeypatch.setattr(commands_module, "diagnose", failing)
 
         exit_code = main(["doctor"])
 
@@ -331,6 +444,20 @@ class TestErrorHandling:
             pytest.param(["snap"], id="missing-pid"),
             pytest.param(["eval", "4321"], id="missing-expression"),
             pytest.param(["eval", "0", "1 + 1"], id="eval-zero-pid"),
+            pytest.param(["diff", "4321"], id="missing-interval"),
+            pytest.param(["diff", "4321", "--interval", "0"], id="zero-interval"),
+            # nan compares false against every bound, so an unguarded parser
+            # would take it and then never wait between samples.
+            pytest.param(["diff", "4321", "--interval", "nan"], id="nan-interval"),
+            pytest.param(["diff", "4321", "--interval", "inf"], id="inf-interval"),
+            pytest.param(
+                ["snap", "4321", "--timeout", "nan"],
+                id="nan-timeout",
+            ),
+            pytest.param(
+                ["diff", "4321", "--interval", "1", "--count", "0"],
+                id="zero-count",
+            ),
             pytest.param([], id="missing-subcommand"),
             pytest.param(["nosuchcommand"], id="unknown-subcommand"),
         ],
