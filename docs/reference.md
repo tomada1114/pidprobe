@@ -13,6 +13,35 @@ it can be piped straight into `jq`; `--pretty` indents it instead.
 `--timeout` (default: 5 seconds) is a hard budget for the whole probe.
 `--no-mask` turns off secret masking, which is otherwise on.
 
+```bash
+pidprobe eval <PID> <EXPR> [--pretty] [--timeout SECONDS] [--no-mask]
+```
+
+`eval` evaluates one Python expression inside a running process and prints its
+rendered value, without collecting a snapshot:
+
+```console
+$ pidprobe eval 12345 'len(queue)'
+{"pid":12345,"expression":"len(queue)","type":"int","result":"12","masking_enabled":true}
+```
+
+The expression is compiled *in the target* against a copy of its `__main__`
+namespace, and the result is rendered by the same rules as stack locals -- the
+bounds and the masking below both apply, and `result` is therefore always a
+string. `type` names the result's type and survives masking.
+
+!!! note
+
+    Statements are not expressions: `pidprobe eval 12345 'cache = {}'` comes
+    back as a `SyntaxError` rather than rebinding anything. Evaluating a
+    *call* can still have side effects, because the target runs it — the same
+    call you would make in a debugger.
+
+Anything the expression raises -- a `SyntaxError` from compiling it, a
+`NameError`, or an exception from the expression itself -- comes back as the
+failure it is, never as a timeout: the target answers with the exception
+instead of going quiet.
+
 ### Secret masking
 
 Values bound to a credential-like name -- `password`, `passwd`, `passphrase`,
@@ -20,19 +49,21 @@ Values bound to a credential-like name -- `password`, `passwd`, `passphrase`,
 `authorization`, matched with case and separators ignored -- are replaced with
 `"<masked>"`. Local variables and values under a matching string key in a
 dictionary are both covered, and `stacks.masking_enabled` records whether
-masking was on.
+masking was on. `eval` matches the same patterns against the expression text,
+so `pidprobe eval 12345 api_key` is masked and reports
+`"masking_enabled": true`.
 
 !!! warning
 
     Masking happens inside the target process, so a masked value never
     crosses the return channel. `--no-mask` removes that guarantee: raw
-    credentials then land in the snapshot, and in whatever you pipe it into.
+    credentials then land in the output, and in whatever you pipe it into.
 
 Every value is rendered within fixed bounds -- 3 levels of nesting, 10
 elements per container, 200 characters per `repr()` and 2000 characters in
 total -- with what was left out marked as `...` or `...<truncated>`.
 
-The command exits `0` on success, `1` when the probe fails (the reason is
+Both commands exit `0` on success, `1` when the probe fails (the reason is
 printed to stderr), and `2` on invalid arguments.
 
 ## Snapshot format
