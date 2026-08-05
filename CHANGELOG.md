@@ -38,8 +38,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   prober's, and `PYTHON_DISABLE_REMOTE_DEBUG` in the target's environment.
   Every failing or warning check carries a cause, a command to confirm it and
   a fix -- enforced by `Check` itself, which refuses to be built without them.
-  Text by default, `--json` for tooling, exit code `1` when a check blocks
-  attaching. Every `snap` and `eval` failure now names `pidprobe doctor <PID>`.
+  Text by default, `--json` for tooling, exit code `7` when a check blocks
+  attaching. Every `snap`, `eval` and `diff` failure names
+  `pidprobe doctor <PID>`.
 - `pidprobe diff <PID> --interval S [--count N]`, plus `iter_snapshot_deltas()`
   and `diff_snapshots()`: repeated snapshots reduced to what changed between
   them -- object counts per type ranked by growth, GC generation statistics
@@ -52,6 +53,49 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   connection pool the target holds with its size, checked-out count and
   overflow, and `"available": false` when the target never imported
   SQLAlchemy.
+- Documented, stable exit codes so a script can act on *what* failed without
+  parsing the message: `0` success, `1` an unclassified probe failure, `2` an
+  invalid command line, `3` no such process, `4` attach refused, `5` timeout,
+  `6` the injected code raised inside the target, `7` `doctor` found a
+  blocking check, `70` a bug in pidprobe, `130` Ctrl-C, `141` a closed stdout
+  pipe. `pidprobe --help` prints the table, and README and the reference
+  document it.
+- `NoSuchProcessError`, the `AttachError` subclass raised when the pid does
+  not exist, so "the process is gone" can be told from "attaching was
+  refused" both in Python and in the exit code.
+- Global `pidprobe --timeout SECONDS` before the subcommand, overriding the
+  5-second default for whichever command follows; the existing per-subcommand
+  `--timeout` still works and wins over it.
+- `pidprobe --debug`, and `PIDPROBE_DEBUG=1`, to re-raise an unexpected error
+  with its traceback instead of summarising it.
+
+### Changed
+
+- **Breaking:** `pidprobe doctor` now exits `7` rather than `1` when a check
+  blocks attaching. `1` no longer means "the diagnosis says no"; it means the
+  probe failed for a reason with no code of its own.
+- **Breaking:** a failing `snap`, `eval` or `diff` no longer always exits `1`.
+  Each failure category now has its own code (`3`, `4`, `5`, `6`), so a script
+  testing `$? -eq 1` must be updated to test for non-zero, or for the
+  category it cares about.
+- An unexpected error in pidprobe itself is now reported as a
+  `pidprobe: internal error: ...` line and exit code `70` instead of a raw
+  traceback; `--debug` restores the traceback.
+- A closed stdout pipe -- `pidprobe snap PID | head -1` -- now exits `141`
+  quietly instead of ending in the interpreter's "Exception ignored" notice.
+- A failing `pidprobe doctor <PID>` no longer suggests running
+  `pidprobe doctor <PID>`.
+
+### Fixed
+
+- The README collector plugin example no longer imports the library it reports
+  on into the target process, which contradicted the plugin guide, and no
+  longer reuses the section name of the shipped `sqlalchemy` plugin, which
+  discovery would reject as a duplicate. The same example in the API
+  reference is corrected too.
+- The ruff pinned by pre-commit is back in step with the one in `uv.lock`, so
+  the pre-commit hook and `just lint` no longer disagree about which rules
+  apply.
 
 ## [0.0.1] - 2026-08-04
 
