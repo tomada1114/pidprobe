@@ -42,8 +42,10 @@ for thread in snapshot["stacks"]["threads"]:
 
     The target process must run CPython 3.14+ with remote debugging enabled,
     and the operating system must allow attaching to it: root on macOS, a
-    permissive `ptrace_scope` or `CAP_SYS_PTRACE` on Linux. When any of that
-    is missing, pidprobe explains which one it was.
+    permissive `ptrace_scope` or `CAP_SYS_PTRACE` on Linux. Run
+    [`pidprobe doctor 12345`](reference.md#command-line) to find out which of
+    those applies before probing -- it checks without attaching, and every
+    failing check comes with the command to confirm it and the fix.
 
 ## What's Next?
 

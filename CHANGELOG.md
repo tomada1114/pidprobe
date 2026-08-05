@@ -30,6 +30,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   contract, `Collector`, `available_collectors()` and `discover_collectors()`
   round out the public API, and a plugin that fails to load or raises inside
   the target costs only its own section.
+- `pidprobe doctor [PID]` and `diagnose()`: attach diagnostics that never
+  attach. Eleven checks cover the prober's own remote-debug support, the
+  return channel, collector plugin health, the Linux Yama `ptrace_scope`
+  policy, macOS `task_for_pid` access, process existence and ownership, PID
+  namespace boundaries, the target's CPython version and its match with the
+  prober's, and `PYTHON_DISABLE_REMOTE_DEBUG` in the target's environment.
+  Every failing or warning check carries a cause, a command to confirm it and
+  a fix -- enforced by `Check` itself, which refuses to be built without them.
+  Text by default, `--json` for tooling, exit code `1` when a check blocks
+  attaching. Every `snap` and `eval` failure now names `pidprobe doctor <PID>`.
 - `sqlalchemy` section: the reference collector plugin reports every
   connection pool the target holds with its size, checked-out count and
   overflow, and `"available": false` when the target never imported
