@@ -11,16 +11,45 @@ Structured JSON snapshots of running CPython 3.14+ processes via PEP 768 - no ag
 ## Quickstart
 
 ```bash
-pip install pidprobe
+uv tool install pidprobe
 # or
-uv add pidprobe
+pip install pidprobe
 ```
+
+Point it at a running CPython 3.14+ process and get one JSON document back:
+
+```bash
+pidprobe snap 12345 | jq '.stacks.threads[0].frames[0]'
+pidprobe snap 12345 --pretty        # indented, for humans
+```
+
+```json
+{
+  "file": "/srv/app/worker.py",
+  "line": 42,
+  "function": "Worker._drain",
+  "locals": { "self": "<Worker queued=1281>", "timeout": "5.0" }
+}
+```
+
+A snapshot carries a `meta` section (both Python versions, the measured stop
+duration, the pidprobe version, the output `schema_version`) plus one section
+per collector: `stacks`, `objects`, `gc` and `fds`. The output format is
+described by a JSON Schema that ships with the package.
+
+The same thing from Python:
 
 ```python
-from pidprobe import add
+from pidprobe import snapshot_schema, take_snapshot
 
-result = add(1, 2)  # 3
+snapshot = take_snapshot(12345)
+print(snapshot["meta"]["stop_duration_ms"])
+print(snapshot_schema()["$id"])
 ```
+
+Attaching needs the target to run CPython 3.14+ with remote debugging enabled,
+and the operating system to allow it (root on macOS, `ptrace_scope` or
+`CAP_SYS_PTRACE` on Linux). Failures explain which of those applies.
 
 ## Design Philosophy
 
