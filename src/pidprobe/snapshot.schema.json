@@ -102,7 +102,7 @@
         "line": { "type": "integer" },
         "function": { "type": "string" },
         "locals": {
-          "description": "Bounded repr of each local variable, or null when the frame refused to expose them.",
+          "description": "Bounded repr of each local variable, \"<masked>\" for credential-like names while masking is on, or null when the frame refused to expose them.",
           "anyOf": [
             { "type": "object", "additionalProperties": { "type": "string" } },
             { "type": "null" }
@@ -135,10 +135,19 @@
     },
     "stacks": {
       "type": "object",
-      "required": ["thread_count", "max_frame_depth", "threads"],
+      "required": [
+        "thread_count",
+        "max_frame_depth",
+        "masking_enabled",
+        "threads"
+      ],
       "properties": {
         "thread_count": { "type": "integer", "minimum": 0 },
         "max_frame_depth": { "type": "integer", "minimum": 1 },
+        "masking_enabled": {
+          "description": "Whether locals whose name looks like a credential were replaced with \"<masked>\" inside the target.",
+          "type": "boolean"
+        },
         "threads": {
           "type": "array",
           "items": { "$ref": "#/$defs/thread" }

@@ -17,6 +17,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `snapshot.schema.json` JSON Schema describing the output format
   (`schema_version` 1.0).
 - `TargetError` for failures raised inside the target process.
+- Safe rendering of every value a snapshot reports: bounded in nesting depth,
+  element count and length, and masking values whose name looks like a
+  credential (`password`, `token`, `api_key`, ...) with `"<masked>"`. Masking
+  runs inside the target, is on by default, is reported as
+  `stacks.masking_enabled`, and is turned off with `pidprobe snap --no-mask`.
 
 ## [0.0.1] - 2026-08-04
 
