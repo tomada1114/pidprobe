@@ -21,6 +21,13 @@ pidprobe snap 12345 | jq .meta
 pidprobe snap 12345 --pretty
 ```
 
+!!! tip
+
+    Locals whose name looks like a credential (`password`, `token`,
+    `api_key`, ...) come back as `"<masked>"`. Masking is on by default and
+    happens inside the target process; `--no-mask` turns it off. See
+    [Secret masking](reference.md#secret-masking).
+
 The same from Python:
 
 ```python

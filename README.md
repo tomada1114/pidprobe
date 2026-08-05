@@ -51,6 +51,34 @@ Attaching needs the target to run CPython 3.14+ with remote debugging enabled,
 and the operating system to allow it (root on macOS, `ptrace_scope` or
 `CAP_SYS_PTRACE` on Linux). Failures explain which of those applies.
 
+## Secret masking
+
+Snapshots get pasted into issues and chat, so pidprobe masks credentials **by
+default**. A value is replaced with `"<masked>"` when the name it is bound to
+contains any of
+
+`password`, `passwd`, `passphrase`, `pwd`, `secret`, `token`, `apikey`,
+`accesskey`, `privatekey`, `credential`, `authorization`
+
+Case and separators are ignored, so `API_KEY`, `api_key` and `apiKey` all
+match. This applies to local variables in stack frames and to values stored
+under a matching string key in a dictionary — `{"api_key": "<masked>"}`. The
+masking happens *inside the target process*, so an unmasked value never
+crosses the wire, and `stacks.masking_enabled` records whether it was on.
+
+Names that merely look similar are masked too (`token_count` is not a
+credential, but it matches `token`): over-masking costs one more look,
+under-masking leaks a secret. Pass `--no-mask` when you need the raw values:
+
+```bash
+pidprobe snap 12345 --no-mask
+```
+
+Every rendered value is bounded regardless of masking: at most 3 levels of
+nesting, 10 elements per container, 200 characters per `repr()` and 2000
+characters in total. Anything left out is shown as `...` or
+`...<truncated>`, so one pathological object cannot blow up a snapshot.
+
 ## Design Philosophy
 
 Every choice in this template has a reason. If you disagree with a decision,
