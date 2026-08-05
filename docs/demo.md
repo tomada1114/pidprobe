@@ -10,29 +10,34 @@ Every command and every block of output on this page was produced by running
 it. Numbers such as timings, addresses and object counts will differ on your
 machine; the shapes will not.
 
-## 1. Build the image
+## 1. Get the image
 
 ```bash
-git clone https://github.com/tomada1114/pidprobe
-cd pidprobe
-docker build -t pidprobe-demo -f demo/Dockerfile .
+docker pull ghcr.io/tomada1114/pidprobe-demo
 ```
 
-The build context is the repository root because the image installs pidprobe
-from this tree rather than from PyPI.
+The image is public and built for `linux/amd64` and `linux/arm64`.
 
-!!! note "Not on a registry yet"
+!!! tip "Building it yourself"
 
-    Once the image is published, `docker pull ghcr.io/tomada1114/pidprobe-demo`
-    replaces this step and the rest of the page works unchanged with
-    `ghcr.io/tomada1114/pidprobe-demo` in place of `pidprobe-demo`. Until
-    then, build it locally.
+    To run the demo against local changes, build from the repository instead:
+
+    ```bash
+    git clone https://github.com/tomada1114/pidprobe
+    cd pidprobe
+    docker build -t pidprobe-demo -f demo/Dockerfile .
+    ```
+
+    The build context is the repository root because the image installs
+    pidprobe from this tree rather than from PyPI. The rest of this page then
+    works unchanged with `pidprobe-demo` in place of
+    `ghcr.io/tomada1114/pidprobe-demo`.
 
 ## 2. Start it
 
 ```bash
 docker run --rm -d --name pidprobe-demo -p 8000:8000 \
-    --cap-add=SYS_PTRACE pidprobe-demo
+    --cap-add=SYS_PTRACE ghcr.io/tomada1114/pidprobe-demo
 ```
 
 ```console

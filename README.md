@@ -144,8 +144,8 @@ request, in a Docker image that already has pidprobe installed beside it —
 which is what the GIF above is recording:
 
 ```bash
-docker build -t pidprobe-demo -f demo/Dockerfile .
-docker run --rm -d --name pidprobe-demo -p 8000:8000 --cap-add=SYS_PTRACE pidprobe-demo
+docker run --rm -d --name pidprobe-demo -p 8000:8000 --cap-add=SYS_PTRACE \
+    ghcr.io/tomada1114/pidprobe-demo
 
 curl -s -X POST localhost:8000/deadlock              # arm the lock-order inversion
 curl -s --max-time 5 localhost:8000/reports/daily    # this never comes back
