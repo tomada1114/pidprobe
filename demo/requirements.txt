@@ -1,0 +1,13 @@
+# Dependencies of the demo application only.
+#
+# They are deliberately absent from pyproject.toml -- not from [project]
+# dependencies, not from any [dependency-groups] entry. pidprobe has no
+# runtime dependencies at all, and a demo must not be the thing that gives it
+# some. Nothing in src/ or tests/ imports these, so `uv sync` never installs
+# them and only the demo image does.
+#
+# Floors rather than pins: the demo tracks whatever current release of each
+# package still works on CPython 3.14.
+fastapi>=0.115
+sqlalchemy>=2.0
+uvicorn>=0.34

@@ -75,6 +75,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   guide gained the collector contract, how to see what discovery found, and
   how to run a collector without a target. A test asserts docs and code agree
   on the check names, their order, the exit code table and the subcommands.
+- Demo environment: `demo/` holds a FastAPI + SQLAlchemy application that is
+  broken on purpose -- a lock-order deadlock that hangs an HTTP request and
+  strands two pooled connections, and an unbounded cache that leaks -- plus a
+  Dockerfile that installs it next to pidprobe, so the same-`major.minor`
+  CPython requirement holds inside one container. The *Demo* documentation
+  page walks the whole thing through `snap`, `diff`, `doctor` and `eval`, and
+  `scripts/record_demo.sh` drives the deadlock half non-interactively for
+  recording and for CI. The demo's dependencies stay out of `pyproject.toml`:
+  pidprobe still has no runtime dependencies.
 
 ### Changed
 

@@ -32,6 +32,7 @@ print(snapshot["meta"]["stop_duration_ms"])
 ## Next Steps
 
 - [Getting Started](getting-started.md) — setup and first steps
+- [Demo](demo.md) — a deliberately broken FastAPI app in Docker to try it on
 - [API Reference](reference.md) — the commands, their options and the Python API
 - [Output Schema](output-schema.md) — every field of the JSON pidprobe prints
 - [Collector Plugins](plugins.md) — add your own snapshot section
