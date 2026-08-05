@@ -13,6 +13,8 @@ import sys
 from typing import TYPE_CHECKING, Any
 
 from ._channel import DEFAULT_TIMEOUT_SECONDS
+from ._diagnosis import as_document, render_text
+from ._doctor import diagnose
 from ._errors import ProbeError
 from ._eval import evaluate_in_target
 from ._snapshot import take_snapshot
@@ -29,7 +31,13 @@ EXIT_OK = 0
 """Exit code for a snapshot that was collected and printed."""
 
 EXIT_PROBE_ERROR = 1
-"""Exit code for a probe that failed: attach, timeout, channel or target."""
+"""Exit code for a probe that failed: attach, timeout, channel or target.
+
+``doctor`` reuses it for a diagnosis that found a blocking check, so "a probe
+of this pid would not work" is one exit code however it was discovered.
+"""
+
+_DOCTOR_HINT = "run `pidprobe doctor {pid}` for attach diagnostics"
 
 _PRETTY_INDENT = 2
 _COMPACT_SEPARATORS = (",", ":")
@@ -118,6 +126,16 @@ def _run_eval(args: argparse.Namespace) -> int:
     return EXIT_OK
 
 
+def _run_doctor(args: argparse.Namespace) -> int:
+    """Run the attach preflight checks and print the report."""
+    diagnosis = diagnose(args.pid)
+    if args.as_json:
+        _write_json(as_document(diagnosis), is_pretty=args.pretty)
+    else:
+        sys.stdout.write(render_text(diagnosis))
+    return EXIT_OK if diagnosis.is_attachable else EXIT_PROBE_ERROR
+
+
 def _add_common_options(parser: argparse.ArgumentParser, *, mask_help: str) -> None:
     """Add the options every probing subcommand shares.
 
@@ -195,6 +213,39 @@ def _add_eval_parser(subcommands: argparse._SubParsersAction[Any]) -> None:
     evaluate.set_defaults(handler=_run_eval)
 
 
+def _add_doctor_parser(subcommands: argparse._SubParsersAction[Any]) -> None:
+    """Register the ``doctor`` subcommand."""
+    doctor = subcommands.add_parser(
+        "doctor",
+        help="explain whether attaching to a process would work",
+        description=(
+            "Run the attach preflight checks and report each one with its "
+            "cause, a command that confirms it and the fix. Nothing is "
+            "injected, so this is safe to run against a production process. "
+            "Without a PID only the checks describing this environment run."
+        ),
+    )
+    doctor.add_argument(
+        "pid",
+        nargs="?",
+        type=_positive_int,
+        default=None,
+        help="process id to diagnose; omit to check only this environment",
+    )
+    doctor.add_argument(
+        "--json",
+        dest="as_json",
+        action="store_true",
+        help="print the report as JSON instead of text",
+    )
+    doctor.add_argument(
+        "--pretty",
+        action="store_true",
+        help="indent the JSON; only meaningful together with --json",
+    )
+    doctor.set_defaults(handler=_run_doctor)
+
+
 def build_parser() -> argparse.ArgumentParser:
     """Build the argument parser for the ``pidprobe`` command.
 
@@ -218,7 +269,23 @@ def build_parser() -> argparse.ArgumentParser:
     subcommands = parser.add_subparsers(dest="command", required=True)
     _add_snap_parser(subcommands)
     _add_eval_parser(subcommands)
+    _add_doctor_parser(subcommands)
     return parser
+
+
+def _explain(error: ProbeError, pid: int | None) -> str:
+    """Render a probe failure, always pointing at ``doctor`` for the details.
+
+    A failed probe is the moment the diagnostics are worth running, so every
+    error path names them -- appended here rather than in each message, so no
+    new failure mode can be added without the hint.
+    """
+    if pid is None:
+        return str(error)
+    hint = _DOCTOR_HINT.format(pid=pid)
+    if hint in str(error):
+        return str(error)
+    return f"{error}; {hint}"
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -236,5 +303,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     try:
         return handler(args)
     except ProbeError as exc:
-        sys.stderr.write(f"{_PROGRAM_NAME}: {exc}\n")
+        sys.stderr.write(
+            f"{_PROGRAM_NAME}: {_explain(exc, getattr(args, 'pid', None))}\n"
+        )
         return EXIT_PROBE_ERROR

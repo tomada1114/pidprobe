@@ -11,7 +11,8 @@ import pytest
 
 from pidprobe import __version__, available_collectors
 from pidprobe import cli as cli_module
-from pidprobe._errors import ProbeTimeoutError
+from pidprobe._diagnosis import Check, CheckStatus, Diagnosis
+from pidprobe._errors import AttachError, ChannelError, ProbeTimeoutError
 from pidprobe.cli import EXIT_OK, EXIT_PROBE_ERROR, build_parser, main
 from pidprobe.collectors import STACKS_COLLECTOR
 from pidprobe.collectors._stacks import build_stacks_collector
@@ -172,6 +173,99 @@ class TestEval:
         assert captured.err.startswith("pidprobe: ")
 
 
+HEALTHY = Diagnosis(
+    pid=4321,
+    checks=(Check(name="return_channel", status=CheckStatus.OK, summary="fine"),),
+)
+BLOCKED = Diagnosis(
+    pid=4321,
+    checks=(
+        Check(
+            name="task_for_pid",
+            status=CheckStatus.FAIL,
+            summary="not root",
+            cause="macOS denies task_for_pid",
+            confirm="id -u",
+            fix="rerun under sudo",
+        ),
+    ),
+)
+
+
+@pytest.fixture
+def fake_diagnosis(monkeypatch):
+    """Make ``doctor`` report a fixed diagnosis and record the pid it got."""
+    calls: dict[str, Any] = {"result": HEALTHY}
+
+    def fake_diagnose(pid: int | None) -> Diagnosis:
+        calls["pid"] = pid
+        result: Diagnosis = calls["result"]
+        return result
+
+    monkeypatch.setattr(cli_module, "diagnose", fake_diagnose)
+    return calls
+
+
+class TestDoctor:
+    def test_a_clean_environment_exits_zero_and_prints_a_report(
+        self,
+        fake_diagnosis,
+        capsys,
+    ):
+        exit_code = main(["doctor", "4321"])
+
+        out = capsys.readouterr().out
+        assert exit_code == EXIT_OK
+        assert fake_diagnosis["pid"] == 4321
+        assert "return_channel" in out
+
+    def test_a_blocking_check_exits_with_the_probe_error_code(
+        self,
+        fake_diagnosis,
+        capsys,
+    ):
+        fake_diagnosis["result"] = BLOCKED
+
+        exit_code = main(["doctor", "4321"])
+
+        out = capsys.readouterr().out
+        assert exit_code == EXIT_PROBE_ERROR
+        assert "cause: macOS denies task_for_pid" in out
+        assert "confirm: id -u" in out
+        assert "fix: rerun under sudo" in out
+
+    def test_the_pid_is_optional(self, fake_diagnosis):
+        exit_code = main(["doctor"])
+
+        assert exit_code == EXIT_OK
+        assert fake_diagnosis["pid"] is None
+
+    def test_json_output_is_a_single_compact_line(self, fake_diagnosis, capsys):
+        fake_diagnosis["result"] = BLOCKED
+
+        main(["doctor", "4321", "--json"])
+
+        out = capsys.readouterr().out
+        assert out.count("\n") == 1
+        assert json.loads(out)["attachable"] is False
+
+    @pytest.mark.usefixtures("fake_diagnosis")
+    def test_pretty_json_is_indented(self, capsys):
+        main(["doctor", "4321", "--json", "--pretty"])
+
+        out = capsys.readouterr().out
+        assert out.count("\n") > 1
+        assert json.loads(out)["pid"] == 4321
+
+    def test_doctor_is_dispatched_through_its_own_handler(self):
+        parser = build_parser()
+        doctor_args = parser.parse_args(["doctor"])
+
+        assert doctor_args.handler is not parser.parse_args(["snap", "1"]).handler
+        assert doctor_args.pid is None
+        assert doctor_args.as_json is False
+
+
 class TestErrorHandling:
     @pytest.mark.usefixtures("failing_snapshot")
     def test_probe_failure_is_explained_on_stderr(self, capsys):
@@ -182,6 +276,47 @@ class TestErrorHandling:
         assert captured.out == ""
         assert captured.err.startswith("pidprobe: ")
         assert "pidprobe doctor 4321" in captured.err
+
+    @pytest.mark.parametrize(
+        "error",
+        [
+            pytest.param(AttachError(4321, "permission denied"), id="attach"),
+            pytest.param(ChannelError("target sent nothing"), id="channel"),
+            pytest.param(ProbeTimeoutError(5.0, 4321), id="timeout"),
+        ],
+    )
+    @pytest.mark.parametrize(
+        "argv",
+        [
+            pytest.param(["snap", "4321"], id="snap"),
+            pytest.param(["eval", "4321", "1 + 1"], id="eval"),
+        ],
+    )
+    def test_every_failure_points_at_doctor(self, monkeypatch, capsys, error, argv):
+        def failing(*_args: Any, **_kwargs: Any) -> dict[str, Any]:
+            raise error
+
+        monkeypatch.setattr(cli_module, "take_snapshot", failing)
+        monkeypatch.setattr(cli_module, "evaluate_in_target", failing)
+
+        exit_code = main(argv)
+
+        stderr = capsys.readouterr().err
+        assert exit_code == EXIT_PROBE_ERROR
+        assert stderr.count("pidprobe doctor 4321") == 1
+
+    def test_a_failure_without_a_pid_cannot_suggest_one(self, monkeypatch, capsys):
+        def failing(_pid: int | None) -> Diagnosis:
+            message = "no channel"
+            raise ChannelError(message)
+
+        monkeypatch.setattr(cli_module, "diagnose", failing)
+
+        exit_code = main(["doctor"])
+
+        stderr = capsys.readouterr().err
+        assert exit_code == EXIT_PROBE_ERROR
+        assert stderr == "pidprobe: no channel\n"
 
     @pytest.mark.parametrize(
         "argv",

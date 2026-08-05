@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from importlib.metadata import PackageNotFoundError, version
 
+from ._diagnosis import Check, CheckStatus, Diagnosis
+from ._doctor import diagnose
 from ._errors import (
     AttachError,
     ChannelError,
@@ -33,8 +35,11 @@ __all__ = [
     "SCHEMA_VERSION",
     "AttachError",
     "ChannelError",
+    "Check",
+    "CheckStatus",
     "Collector",
     "CollectorSpec",
+    "Diagnosis",
     "Evaluation",
     "ProbeError",
     "ProbeTimeoutError",
@@ -42,6 +47,7 @@ __all__ = [
     "__version__",
     "add",
     "available_collectors",
+    "diagnose",
     "discover_collectors",
     "evaluate_in_target",
     "snapshot_schema",

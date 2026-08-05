@@ -51,6 +51,32 @@ Attaching needs the target to run CPython 3.14+ with remote debugging enabled,
 and the operating system to allow it (root on macOS, `ptrace_scope` or
 `CAP_SYS_PTRACE` on Linux). Failures explain which of those applies.
 
+## Why won't it attach?
+
+`doctor` answers that before you hit it, and without attaching to anything:
+
+```console
+$ pidprobe doctor 12345
+  OK      prober_remote_debug   pidprobe runs cpython 3.14.6 with remote debugging enabled
+  FAIL    ptrace_scope          kernel.yama.ptrace_scope is 2
+            cause: at scope 2 only a process holding CAP_SYS_PTRACE may attach to anything, ...
+            confirm: cat /proc/sys/kernel/yama/ptrace_scope
+            fix: run pidprobe as root or with CAP_SYS_PTRACE, or relax the knob with ...
+```
+
+Every check that fails or warns carries a cause, a command you can run to
+confirm it yourself, and the concrete fix — never a bare "Permission denied".
+The `PID` is optional: without one, only the checks describing your own
+environment run. `--json` prints the same report for tooling, and any `snap`
+or `eval` failure points you here.
+
+```python
+from pidprobe import diagnose
+
+for check in diagnose(12345).failures:
+    print(check.name, check.fix)
+```
+
 ## Evaluating an expression
 
 When you only want one value, `eval` skips the collectors and answers with the

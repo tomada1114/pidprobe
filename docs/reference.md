@@ -63,8 +63,73 @@ Every value is rendered within fixed bounds -- 3 levels of nesting, 10
 elements per container, 200 characters per `repr()` and 2000 characters in
 total -- with what was left out marked as `...` or `...<truncated>`.
 
-Both commands exit `0` on success, `1` when the probe fails (the reason is
-printed to stderr), and `2` on invalid arguments.
+```bash
+pidprobe doctor [PID] [--json] [--pretty]
+```
+
+`doctor` explains whether attaching would work, without attaching: it never
+injects anything, so it is safe to point at a production process. Given a
+`PID` it also examines that process; without one it reports only on this
+environment, which is what you want before there is a target to name.
+
+```console
+$ pidprobe doctor 12345
+pidprobe doctor: checking this environment against pid 12345
+
+  OK      prober_remote_debug   pidprobe runs cpython 3.14.6 with remote debugging enabled
+  OK      return_channel        an AF_UNIX return channel binds at /tmp/pidprobe-3f9a1c2e/s.sock
+  OK      collector_plugins     5 collectors will run: stacks, objects, gc, fds, sqlalchemy
+  FAIL    ptrace_scope          kernel.yama.ptrace_scope is 2
+            cause: at scope 2 only a process holding CAP_SYS_PTRACE may attach to anything, ...
+            confirm: cat /proc/sys/kernel/yama/ptrace_scope
+            fix: run pidprobe as root or with CAP_SYS_PTRACE, or relax the knob with ...
+  ...
+
+1 check failed; attaching to pid 12345 will not work
+```
+
+Every check that fails or warns carries all four of the things you need: which
+check it was, the *cause*, a *confirm* command you can run yourself, and the
+*fix*. The type rejects a check built without them, so no diagnosis can come
+back as a bare "Permission denied".
+`--json` prints the same report as `{"pid", "attachable", "checks"}` for
+tooling.
+
+| Check | What it answers |
+| --- | --- |
+| `prober_remote_debug` | Can this interpreter call `sys.remote_exec` at all? |
+| `return_channel` | Can a channel be created for the target to answer on? |
+| `collector_plugins` | Did every installed collector plugin load? |
+| `ptrace_scope` | Does the Linux Yama policy permit attaching? |
+| `task_for_pid` | Does macOS grant this user the target's task port? |
+| `target_process` | Does the pid exist and may this user signal it? |
+| `target_owner` | Do prober and target run as the same user? |
+| `pid_namespace` | Is there a container boundary between them? |
+| `target_python_version` | Is the target CPython 3.14+? |
+| `target_python_match` | Do both sides share a CPython feature release? |
+| `target_remote_debug` | Was the target started with `PYTHON_DISABLE_REMOTE_DEBUG`? |
+
+!!! note
+
+    A check that cannot be answered here is reported as `SKIPPED` rather than
+    guessed at: `ptrace_scope` on macOS, `task_for_pid` on Linux, and
+    everything that reads another process' environment or namespace off
+    Linux. Skipped checks still print the command that would answer them.
+
+!!! warning
+
+    Establishing the target's Python version means running the target's own
+    executable with `-c` -- a process cannot be asked for its version from
+    the outside. That only happens when the binary's name identifies it as an
+    interpreter (`python*`, `pypy*`), so pointing `doctor` at an arbitrary pid
+    never executes an arbitrary program; it reports `target_python` as a
+    warning instead.
+
+All three commands exit `0` on success, `1` when the probe fails or `doctor`
+found a blocking check (the reason is printed to stderr for `snap` and `eval`,
+to stdout for `doctor`), and `2` on invalid arguments. A `snap` or `eval`
+failure always names `pidprobe doctor <PID>` in its error, whatever went
+wrong.
 
 ## Snapshot format
 
