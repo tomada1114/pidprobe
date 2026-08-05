@@ -16,30 +16,11 @@ from pidprobe._envelope import Envelope, ErrorInfo
 from pidprobe._snapshot import take_snapshot
 from pidprobe.collectors import BUILTIN_COLLECTORS, Collector
 
-from .conftest import run_collector_source
-
 
 @pytest.fixture
 def validate_snapshot():
     """Return a validator compiled from the packaged JSON Schema."""
     return fastjsonschema.compile(snapshot_schema())
-
-
-@pytest.fixture
-def local_target(monkeypatch):
-    """Run the injected source in this process instead of a remote target.
-
-    Returns a dict that records what the channel was asked to do, so tests can
-    assert on the arguments ``take_snapshot`` passed on.
-    """
-    calls: dict[str, Any] = {}
-
-    def fake_execute(pid: int, source: str, **kwargs: Any) -> Envelope:
-        calls.update(pid=pid, source=source, **kwargs)
-        return Envelope(status="ok", error=None, payload=run_collector_source(source))
-
-    monkeypatch.setattr(snapshot_module, "execute_in_target", fake_execute)
-    return calls
 
 
 @pytest.fixture
