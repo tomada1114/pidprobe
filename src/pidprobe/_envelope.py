@@ -11,7 +11,7 @@ from __future__ import annotations
 import json
 from typing import Any, Literal, TypedDict
 
-from ._errors import ChannelError
+from ._errors import ChannelError, TargetError
 
 _VALID_STATUSES = frozenset({"ok", "error"})
 _UNKNOWN_ERROR_TYPE = "UnknownError"
@@ -99,3 +99,34 @@ def parse_envelope(raw: str) -> Envelope:
         message = f"envelope 'payload' must be an object or null, got {payload!r}"
         raise ChannelError(message)
     return Envelope(status=status, error=error, payload=payload)
+
+
+def payload_of(
+    pid: int, envelope: Envelope, *, action: str = "snapshot"
+) -> dict[str, Any]:
+    """Return the payload of a successful envelope.
+
+    Args:
+        pid: Process the envelope came from.
+        envelope: Answer already validated by :func:`parse_envelope`.
+        action: What the injected script was asked to do; it names the
+            failure in the raised message.
+
+    Returns:
+        The payload the target produced.
+
+    Raises:
+        TargetError: If the target reported a failure.
+        ChannelError: If the target reported success without a payload.
+    """
+    if envelope["status"] == "error":
+        error: ErrorInfo | None = envelope["error"]
+        if error is None:  # pragma: no cover -- parse_envelope rejects this
+            message = f"target reported an error without details for pid {pid}"
+            raise ChannelError(message)
+        raise TargetError(pid, error, action=action)
+    payload = envelope["payload"]
+    if payload is None:
+        message = f"target reported success without a payload for pid {pid}"
+        raise ChannelError(message)
+    return payload

@@ -17,6 +17,13 @@ from pidprobe.collectors import BUILTIN_COLLECTORS, STACKS_COLLECTOR
 from pidprobe.collectors._stacks import build_stacks_collector
 
 SNAPSHOT = {"schema_version": "1.0", "meta": {"pid": 4321}, "gc": {"enabled": True}}
+EVALUATION = {
+    "pid": 4321,
+    "expression": "1 + 1",
+    "type": "int",
+    "result": "2",
+    "masking_enabled": True,
+}
 
 
 @pytest.fixture
@@ -97,6 +104,72 @@ class TestSnapMasking:
         assert args.is_masked is True
 
 
+@pytest.fixture
+def fake_evaluation(monkeypatch):
+    """Make ``eval`` return a fixed document and record its arguments."""
+    calls: dict[str, Any] = {}
+
+    def fake_evaluate_in_target(
+        pid: int,
+        expression: str,
+        **kwargs: Any,
+    ) -> dict[str, Any]:
+        calls.update(pid=pid, expression=expression, **kwargs)
+        return EVALUATION
+
+    monkeypatch.setattr(cli_module, "evaluate_in_target", fake_evaluate_in_target)
+    return calls
+
+
+class TestEval:
+    @pytest.mark.usefixtures("fake_evaluation")
+    def test_default_output_is_a_single_compact_json_line(self, capsys):
+        exit_code = main(["eval", "4321", "1 + 1"])
+
+        out = capsys.readouterr().out
+        assert exit_code == EXIT_OK
+        assert out.count("\n") == 1
+        assert json.loads(out) == EVALUATION
+
+    @pytest.mark.usefixtures("fake_evaluation")
+    def test_pretty_output_is_indented_json(self, capsys):
+        main(["eval", "4321", "1 + 1", "--pretty"])
+
+        out = capsys.readouterr().out
+        assert out.count("\n") > 1
+        assert json.loads(out) == EVALUATION
+
+    def test_expression_timeout_and_masking_reach_the_evaluation(
+        self,
+        fake_evaluation,
+    ):
+        main(["eval", "4321", "api_key", "--timeout", "0.5", "--no-mask"])
+
+        assert fake_evaluation["pid"] == 4321
+        assert fake_evaluation["expression"] == "api_key"
+        assert fake_evaluation["timeout_seconds"] == pytest.approx(0.5)
+        assert fake_evaluation["is_masked"] is False
+
+    def test_masking_is_on_by_default(self, fake_evaluation):
+        main(["eval", "4321", "api_key"])
+
+        assert fake_evaluation["is_masked"] is True
+        assert fake_evaluation["timeout_seconds"] == pytest.approx(5.0)
+
+    def test_probe_failure_is_explained_on_stderr(self, monkeypatch, capsys):
+        def failing(pid: int, expression: str, **kwargs: Any) -> dict[str, Any]:
+            raise ProbeTimeoutError(5.0, pid)
+
+        monkeypatch.setattr(cli_module, "evaluate_in_target", failing)
+
+        exit_code = main(["eval", "4321", "1 + 1"])
+
+        captured = capsys.readouterr()
+        assert exit_code == EXIT_PROBE_ERROR
+        assert captured.out == ""
+        assert captured.err.startswith("pidprobe: ")
+
+
 class TestErrorHandling:
     @pytest.mark.usefixtures("failing_snapshot")
     def test_probe_failure_is_explained_on_stderr(self, capsys):
@@ -119,6 +192,8 @@ class TestErrorHandling:
                 ["snap", "4321", "--timeout", "nope"], id="non-numeric-timeout"
             ),
             pytest.param(["snap"], id="missing-pid"),
+            pytest.param(["eval", "4321"], id="missing-expression"),
+            pytest.param(["eval", "0", "1 + 1"], id="eval-zero-pid"),
             pytest.param([], id="missing-subcommand"),
             pytest.param(["nosuchcommand"], id="unknown-subcommand"),
         ],
@@ -158,3 +233,13 @@ class TestParser:
         assert callable(args.handler)
         assert args.pid == 4321
         assert args.pretty is False
+
+    def test_eval_is_dispatched_through_its_own_handler(self):
+        parser = build_parser()
+        snap_args = parser.parse_args(["snap", "4321"])
+        eval_args = parser.parse_args(["eval", "4321", "len(cache)"])
+
+        assert callable(eval_args.handler)
+        assert eval_args.handler is not snap_args.handler
+        assert eval_args.expression == "len(cache)"
+        assert eval_args.is_masked is True

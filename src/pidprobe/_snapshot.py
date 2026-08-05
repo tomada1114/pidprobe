@@ -14,7 +14,7 @@ from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
 from ._channel import DEFAULT_TIMEOUT_SECONDS, execute_in_target
-from ._errors import ChannelError, TargetError
+from ._envelope import payload_of
 from ._schema import SCHEMA_VERSION
 from .collectors import compose_collector_source
 from .registry import available_collectors
@@ -22,7 +22,6 @@ from .registry import available_collectors
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
-    from ._envelope import Envelope, ErrorInfo
     from .collectors import Collector
 
 _MILLISECONDS = 1000.0
@@ -71,27 +70,7 @@ def take_snapshot(
         allow_socket=allow_socket,
     )
     elapsed_ms = (time.perf_counter() - started) * _MILLISECONDS
-    return _document(pid, _payload(pid, envelope), elapsed_ms)
-
-
-def _payload(pid: int, envelope: Envelope) -> dict[str, Any]:
-    """Return the payload of a successful envelope.
-
-    Raises:
-        TargetError: If the target reported a failure.
-        ChannelError: If the target reported success without a payload.
-    """
-    if envelope["status"] == "error":
-        error: ErrorInfo | None = envelope["error"]
-        if error is None:  # pragma: no cover -- parse_envelope rejects this
-            message = f"target reported an error without details for pid {pid}"
-            raise ChannelError(message)
-        raise TargetError(pid, error)
-    payload = envelope["payload"]
-    if payload is None:
-        message = f"target reported success without a payload for pid {pid}"
-        raise ChannelError(message)
-    return payload
+    return _document(pid, payload_of(pid, envelope), elapsed_ms)
 
 
 def _interpreter() -> dict[str, Any]:

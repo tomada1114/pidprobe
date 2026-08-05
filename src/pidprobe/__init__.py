@@ -11,6 +11,7 @@ from ._errors import (
     ProbeTimeoutError,
     TargetError,
 )
+from ._eval import Evaluation, evaluate_in_target
 from ._schema import SCHEMA_VERSION, snapshot_schema
 from ._snapshot import take_snapshot
 from .collectors import Collector
@@ -34,6 +35,7 @@ __all__ = [
     "ChannelError",
     "Collector",
     "CollectorSpec",
+    "Evaluation",
     "ProbeError",
     "ProbeTimeoutError",
     "TargetError",
@@ -41,6 +43,7 @@ __all__ = [
     "add",
     "available_collectors",
     "discover_collectors",
+    "evaluate_in_target",
     "snapshot_schema",
     "take_snapshot",
 ]

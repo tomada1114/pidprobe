@@ -51,6 +51,28 @@ Attaching needs the target to run CPython 3.14+ with remote debugging enabled,
 and the operating system to allow it (root on macOS, `ptrace_scope` or
 `CAP_SYS_PTRACE` on Linux). Failures explain which of those applies.
 
+## Evaluating an expression
+
+When you only want one value, `eval` skips the collectors and answers with the
+rendered result of a single expression:
+
+```console
+$ pidprobe eval 12345 'len(queue)'
+{"pid":12345,"expression":"len(queue)","type":"int","result":"12","masking_enabled":true}
+```
+
+The expression is compiled inside the target, against a copy of its `__main__`
+namespace, and the result goes through the same bounds and masking as stack
+locals. Statements are refused — `cache = {}` comes back as a `SyntaxError` —
+and anything the expression raises is reported on stderr with exit code `1`,
+never as a hang.
+
+```python
+from pidprobe import evaluate_in_target
+
+print(evaluate_in_target(12345, "len(queue)")["result"])
+```
+
 ## Secret masking
 
 Snapshots get pasted into issues and chat, so pidprobe masks credentials **by
@@ -61,8 +83,9 @@ contains any of
 `accesskey`, `privatekey`, `credential`, `authorization`
 
 Case and separators are ignored, so `API_KEY`, `api_key` and `apiKey` all
-match. This applies to local variables in stack frames and to values stored
-under a matching string key in a dictionary — `{"api_key": "<masked>"}`. The
+match. This applies to local variables in stack frames, to values stored
+under a matching string key in a dictionary — `{"api_key": "<masked>"}` — and
+to the expression text `pidprobe eval` is given. The
 masking happens *inside the target process*, so an unmasked value never
 crosses the wire, and `stacks.masking_enabled` records whether it was on.
 

@@ -1,4 +1,4 @@
-"""Happy-path target process: a tight sleep loop with known local state.
+"""Happy-path target process: a tight sleep loop with known state.
 
 Run standalone with ``python tests/targets/sleeper.py``. Prints ``READY`` to
 stdout once the main loop starts, so a test harness can synchronize before
@@ -12,6 +12,12 @@ boundary -- gets frequent opportunities to run without a long wait.
 from __future__ import annotations
 
 import time
+
+# Module-level state, so `pidprobe eval` has something to resolve in this
+# target's __main__ namespace. The credential-like name is what the masking
+# tests evaluate; the value is fake.
+INVENTORY = {"widgets": 3, "gadgets": 7}
+api_key = "not-a-real-secret"
 
 
 def _run() -> None:

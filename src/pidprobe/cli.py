@@ -14,12 +14,13 @@ from typing import TYPE_CHECKING, Any
 
 from ._channel import DEFAULT_TIMEOUT_SECONDS
 from ._errors import ProbeError
+from ._eval import evaluate_in_target
 from ._snapshot import take_snapshot
 from .collectors._stacks import build_stacks_collector
 from .registry import available_collectors
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Sequence
+    from collections.abc import Callable, Mapping, Sequence
 
     from .collectors import Collector
 
@@ -69,7 +70,7 @@ def _positive_float(value: str) -> float:
     return number
 
 
-def _write_json(document: dict[str, Any], *, is_pretty: bool) -> None:
+def _write_json(document: Mapping[str, Any], *, is_pretty: bool) -> None:
     """Write a JSON document to stdout, compact by default."""
     if is_pretty:
         text = json.dumps(document, indent=_PRETTY_INDENT)
@@ -105,6 +106,95 @@ def _run_snap(args: argparse.Namespace) -> int:
     return EXIT_OK
 
 
+def _run_eval(args: argparse.Namespace) -> int:
+    """Evaluate one expression in the target and print the result."""
+    evaluation = evaluate_in_target(
+        args.pid,
+        args.expression,
+        timeout_seconds=args.timeout,
+        is_masked=args.is_masked,
+    )
+    _write_json(evaluation, is_pretty=args.pretty)
+    return EXIT_OK
+
+
+def _add_common_options(parser: argparse.ArgumentParser, *, mask_help: str) -> None:
+    """Add the options every probing subcommand shares.
+
+    Args:
+        parser: Subcommand parser to extend.
+        mask_help: What ``--no-mask`` does in this subcommand, phrased as the
+            first clause of its help text.
+    """
+    parser.add_argument(
+        "--pretty",
+        action="store_true",
+        help="indent the JSON instead of printing it on a single line",
+    )
+    parser.add_argument(
+        "--timeout",
+        type=_positive_float,
+        default=DEFAULT_TIMEOUT_SECONDS,
+        metavar="SECONDS",
+        help=(
+            f"hard budget for the whole probe (default: {DEFAULT_TIMEOUT_SECONDS:g})"
+        ),
+    )
+    parser.add_argument(
+        "--no-mask",
+        dest="is_masked",
+        action="store_false",
+        help=(
+            f"{mask_help}; masking is on by default and happens inside the "
+            "target process"
+        ),
+    )
+
+
+def _add_snap_parser(subcommands: argparse._SubParsersAction[Any]) -> None:
+    """Register the ``snap`` subcommand."""
+    snap = subcommands.add_parser(
+        "snap",
+        help="collect one snapshot of a running process",
+        description=(
+            "Inject the built-in collectors, plus any installed collector "
+            "plugin, into a running process and print one JSON snapshot of "
+            "its threads, objects, GC state and open file descriptors."
+        ),
+    )
+    snap.add_argument("pid", type=_positive_int, help="process id of the target")
+    _add_common_options(
+        snap,
+        mask_help="show credential-like locals instead of masking them",
+    )
+    snap.set_defaults(handler=_run_snap)
+
+
+def _add_eval_parser(subcommands: argparse._SubParsersAction[Any]) -> None:
+    """Register the ``eval`` subcommand."""
+    evaluate = subcommands.add_parser(
+        "eval",
+        help="evaluate one expression inside a running process",
+        description=(
+            "Evaluate a Python expression against a copy of the target's "
+            "__main__ namespace and print its bounded, credential-masking "
+            "repr as JSON. Statements are rejected: an evaluation reads the "
+            "target rather than rebinding its names."
+        ),
+    )
+    evaluate.add_argument("pid", type=_positive_int, help="process id of the target")
+    evaluate.add_argument(
+        "expression",
+        metavar="EXPR",
+        help="Python expression to evaluate inside the target",
+    )
+    _add_common_options(
+        evaluate,
+        mask_help="show a credential-like result instead of masking it",
+    )
+    evaluate.set_defaults(handler=_run_eval)
+
+
 def build_parser() -> argparse.ArgumentParser:
     """Build the argument parser for the ``pidprobe`` command.
 
@@ -126,41 +216,8 @@ def build_parser() -> argparse.ArgumentParser:
         version=f"{_PROGRAM_NAME} {__version__}",
     )
     subcommands = parser.add_subparsers(dest="command", required=True)
-
-    snap = subcommands.add_parser(
-        "snap",
-        help="collect one snapshot of a running process",
-        description=(
-            "Inject the built-in collectors, plus any installed collector "
-            "plugin, into a running process and print one JSON snapshot of "
-            "its threads, objects, GC state and open file descriptors."
-        ),
-    )
-    snap.add_argument("pid", type=_positive_int, help="process id of the target")
-    snap.add_argument(
-        "--pretty",
-        action="store_true",
-        help="indent the JSON instead of printing it on a single line",
-    )
-    snap.add_argument(
-        "--timeout",
-        type=_positive_float,
-        default=DEFAULT_TIMEOUT_SECONDS,
-        metavar="SECONDS",
-        help=(
-            f"hard budget for the whole probe (default: {DEFAULT_TIMEOUT_SECONDS:g})"
-        ),
-    )
-    snap.add_argument(
-        "--no-mask",
-        dest="is_masked",
-        action="store_false",
-        help=(
-            "show credential-like locals instead of masking them; masking is "
-            "on by default and happens inside the target process"
-        ),
-    )
-    snap.set_defaults(handler=_run_snap)
+    _add_snap_parser(subcommands)
+    _add_eval_parser(subcommands)
     return parser
 
 

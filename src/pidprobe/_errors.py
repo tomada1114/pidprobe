@@ -115,20 +115,25 @@ class ChannelError(ProbeError):
 class TargetError(ProbeError):
     """Raised when the injected code failed as a whole inside the target.
 
-    A single failing collector is reported per section instead, so this error
-    means the injected script itself could not produce a payload -- for
-    example because the collected data would not serialize.
+    A single failing collector is reported per section instead, so for a
+    snapshot this error means the injected script itself could not produce a
+    payload -- for example because the collected data would not serialize.
+    An evaluated expression has no such per-section isolation: whatever it
+    raises inside the target arrives here.
     """
 
-    def __init__(self, pid: int, error: ErrorInfo) -> None:
+    def __init__(self, pid: int, error: ErrorInfo, *, action: str = "snapshot") -> None:
         """Build the error.
 
         Args:
-            pid: Process id the snapshot was taken from.
+            pid: Process id the injected code ran in.
             error: Failure details reported by the target.
+            action: What the injected code was asked to do, named first in
+                the message so ``snap`` and ``eval`` failures read correctly.
         """
         super().__init__(
-            f"snapshot failed inside pid {pid}: {error['type']}: {error['message']}",
+            f"{action} failed inside pid {pid}: {error['type']}: {error['message']}",
         )
         self.pid = pid
         self.error = error
+        self.action = action
