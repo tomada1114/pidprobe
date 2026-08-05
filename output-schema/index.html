@@ -1,0 +1,1425 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Structured JSON snapshots of running CPython 3.14+ processes via PEP 768 - no agent, no restart, no gdb">
+      
+      
+      
+        <link rel="canonical" href="https://tomada1114.github.io/pidprobe/output-schema/">
+      
+      
+        <link rel="prev" href="../reference/">
+      
+      
+        <link rel="next" href="../plugins/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>Output Schema - pidprobe</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#output-schema" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="pidprobe" class="md-header__button md-logo" aria-label="pidprobe" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            pidprobe
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Output Schema
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/tomada1114/pidprobe" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    tomada1114/pidprobe
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="pidprobe" class="md-nav__button md-logo" aria-label="pidprobe" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    pidprobe
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/tomada1114/pidprobe" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    tomada1114/pidprobe
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../getting-started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../demo/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Demo
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Output Schema
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Output Schema
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#where-each-document-is-described" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Where each document is described
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-envelope" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The envelope
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#snapshot-document" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Snapshot document
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Snapshot document">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#meta" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        meta
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#stacks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        stacks
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#objects" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        objects
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#gc" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        gc
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fds" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        fds
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#validating-a-snapshot" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Validating a snapshot
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plugins/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Collector Plugins
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../troubleshooting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../contributing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contributing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#where-each-document-is-described" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Where each document is described
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-envelope" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The envelope
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#snapshot-document" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Snapshot document
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Snapshot document">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#meta" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        meta
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#stacks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        stacks
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#objects" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        objects
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#gc" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        gc
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fds" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        fds
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#validating-a-snapshot" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Validating a snapshot
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="output-schema">Output schema<a class="headerlink" href="#output-schema" title="Permanent link">&para;</a></h1>
+<p><code>pidprobe snap &lt;PID&gt;</code> prints one JSON document per run. This page describes
+that document field by field, and the <code>{status, error, payload}</code> envelope the
+target answers with underneath it.</p>
+<p>Everything here is versioned by <code>schema_version</code>, and the same shape is
+published as a JSON Schema inside the installed package, so downstream tooling
+can validate a snapshot instead of guessing at it.</p>
+<h2 id="where-each-document-is-described">Where each document is described<a class="headerlink" href="#where-each-document-is-described" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Document</th>
+<th>Printed by</th>
+<th>Described in</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Snapshot</td>
+<td><code>pidprobe snap</code></td>
+<td>this page</td>
+</tr>
+<tr>
+<td>Delta</td>
+<td><code>pidprobe diff</code></td>
+<td><a href="../reference/#delta-format">Delta format</a></td>
+</tr>
+<tr>
+<td>Evaluation</td>
+<td><code>pidprobe eval</code></td>
+<td><a href="../reference/#command-line">Command line</a></td>
+</tr>
+<tr>
+<td>Diagnosis</td>
+<td><code>pidprobe doctor --json</code></td>
+<td><a href="../troubleshooting/#the-json-report">The JSON report</a></td>
+</tr>
+</tbody>
+</table>
+<p>A delta carries the same <code>schema_version</code> string, because that version tracks
+pidprobe's output format as a whole, but only the snapshot is described by
+<code>snapshot.schema.json</code>. The evaluation and the diagnosis carry no version of
+their own.</p>
+<h2 id="the-envelope">The envelope<a class="headerlink" href="#the-envelope" title="Permanent link">&para;</a></h2>
+<p>A probe is one round trip: pidprobe injects a script, the script runs inside
+the target and answers exactly once on the return channel. That answer is
+always the same three-key object, whatever the script was asked to do:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="p">{</span><span class="w"> </span><span class="nt">&quot;status&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;ok&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;error&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">null</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;payload&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nt">&quot;...&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;...&quot;</span><span class="w"> </span><span class="p">}</span><span class="w"> </span><span class="p">}</span>
+</code></pre></div>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Contents</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>status</code></td>
+<td><code>"ok"</code> when the script produced a payload, <code>"error"</code> when it raised</td>
+</tr>
+<tr>
+<td><code>error</code></td>
+<td><code>null</code> on success; otherwise <code>{"type", "message", "traceback"}</code> as strings, all three required</td>
+</tr>
+<tr>
+<td><code>payload</code></td>
+<td>The script's result on success, <code>null</code> on failure</td>
+</tr>
+</tbody>
+</table>
+<p>The envelope is the trust boundary. It is produced by another interpreter that
+pidprobe does not control, so it is validated before anything else sees it: a
+malformed answer -- not JSON, not an object, an unknown <code>status</code>, an <code>error</code>
+status with no details, or a success with no payload -- raises <code>ChannelError</code>
+and ends the command with <a href="../reference/#exit-codes">exit code <code>1</code></a>. An
+<code>"error"</code> envelope raises <code>TargetError</code> and exits <code>6</code>.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>You never see an envelope in normal output: the prober unwraps it and
+prints the payload, reshaped into the documents above. It is worth knowing
+about when you write a collector, because it is what an exception inside
+the target turns into -- and, for a snapshot, why one raising collector
+costs its own section rather than the whole answer.</p>
+</div>
+<p>For a snapshot the payload is the raw material, and the prober -- not the
+target -- assembles the document from it:</p>
+<table>
+<thead>
+<tr>
+<th>Payload key</th>
+<th>Becomes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>sections</code></td>
+<td>One top-level key per collector, named after the collector</td>
+</tr>
+<tr>
+<td><code>collectors</code></td>
+<td><code>meta.collectors</code></td>
+</tr>
+<tr>
+<td><code>target</code></td>
+<td><code>meta.target</code></td>
+</tr>
+<tr>
+<td><code>stop_duration_ms</code></td>
+<td><code>meta.stop_duration_ms</code></td>
+</tr>
+</tbody>
+</table>
+<h2 id="snapshot-document">Snapshot document<a class="headerlink" href="#snapshot-document" title="Permanent link">&para;</a></h2>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="p">{</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="w">  </span><span class="nt">&quot;schema_version&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;1.0&quot;</span><span class="p">,</span>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="w">  </span><span class="nt">&quot;meta&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nt">&quot;...&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;...&quot;</span><span class="w"> </span><span class="p">},</span>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="w">  </span><span class="nt">&quot;stacks&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nt">&quot;...&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;...&quot;</span><span class="w"> </span><span class="p">},</span>
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="w">  </span><span class="nt">&quot;objects&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nt">&quot;...&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;...&quot;</span><span class="w"> </span><span class="p">},</span>
+<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="w">  </span><span class="nt">&quot;gc&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nt">&quot;...&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;...&quot;</span><span class="w"> </span><span class="p">},</span>
+<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="w">  </span><span class="nt">&quot;fds&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nt">&quot;...&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;...&quot;</span><span class="w"> </span><span class="p">},</span>
+<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a><span class="w">  </span><span class="nt">&quot;sqlalchemy&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nt">&quot;...&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;...&quot;</span><span class="w"> </span><span class="p">}</span>
+<a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a><span class="p">}</span>
+</code></pre></div>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Type</th>
+<th>Contents</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>schema_version</code></td>
+<td>string</td>
+<td>Version of this output format, currently <code>"1.0"</code></td>
+</tr>
+<tr>
+<td><code>meta</code></td>
+<td>object</td>
+<td>Everything about the probe itself; never <code>null</code></td>
+</tr>
+<tr>
+<td><code>stacks</code>, <code>objects</code>, <code>gc</code>, <code>fds</code></td>
+<td>object or <code>null</code></td>
+<td>The built-in sections, always present as keys</td>
+</tr>
+<tr>
+<td><em>anything else</em></td>
+<td>object or <code>null</code></td>
+<td>One section per installed <a href="../plugins/">collector plugin</a>, named after it</td>
+</tr>
+</tbody>
+</table>
+<p>A section is <code>null</code> exactly when its collector raised inside the target; the
+reason is then in <code>meta.collectors</code>. The four built-in keys are always
+present, so a consumer can read <code>snapshot["gc"]</code> without a <code>get()</code> and only
+has to handle <code>null</code>.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p><code>schema_version</code> is bumped in its minor part for additive changes -- a new
+field, a new section -- and in its major part for anything that would break
+a reader. Unknown top-level keys are allowed by the schema, because that is
+how plugins add sections, so a validator must not reject them.</p>
+</div>
+<h3 id="meta"><code>meta</code><a class="headerlink" href="#meta" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Type</th>
+<th>Contents</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>pid</code></td>
+<td>integer</td>
+<td>Process pidprobe was pointed at</td>
+</tr>
+<tr>
+<td><code>captured_at</code></td>
+<td>string</td>
+<td>UTC timestamp in ISO 8601 form, e.g. <code>2026-08-05T14:51:08.863505Z</code>, taken by the prober</td>
+</tr>
+<tr>
+<td><code>pidprobe_version</code></td>
+<td>string</td>
+<td>Version of pidprobe that produced the document</td>
+</tr>
+<tr>
+<td><code>prober</code></td>
+<td>object</td>
+<td>Interpreter pidprobe itself runs on</td>
+</tr>
+<tr>
+<td><code>target</code></td>
+<td>object</td>
+<td>Interpreter the target runs, as the target reports itself</td>
+</tr>
+<tr>
+<td><code>stop_duration_ms</code></td>
+<td>number</td>
+<td>Time the target spent running the collectors, measured inside the target</td>
+</tr>
+<tr>
+<td><code>elapsed_ms</code></td>
+<td>number</td>
+<td>Wall-clock time of the whole probe, measured by the prober</td>
+</tr>
+<tr>
+<td><code>collectors</code></td>
+<td>array</td>
+<td>One report per collector that ran</td>
+</tr>
+</tbody>
+</table>
+<p><code>prober</code> and <code>target</code> share one shape: <code>python_version</code>, <code>implementation</code>,
+<code>platform</code> and <code>executable</code>, all strings. <code>target</code> additionally carries the
+<code>pid</code> the target sees for itself.</p>
+<p><code>stop_duration_ms</code> is the number to watch in production: it is how long the
+target was busy answering, and therefore what the probe cost the application.
+<code>elapsed_ms</code> is larger by the injection and read-back the prober did around
+it. Both are rounded to three decimals, and either is <code>null</code> if the target
+reported something that is not a number.</p>
+<p>Each entry of <code>collectors</code> is:</p>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Type</th>
+<th>Contents</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>name</code></td>
+<td>string</td>
+<td>Section the collector fills</td>
+</tr>
+<tr>
+<td><code>status</code></td>
+<td>string</td>
+<td><code>"ok"</code> or <code>"error"</code></td>
+</tr>
+<tr>
+<td><code>duration_ms</code></td>
+<td>number</td>
+<td>How long that one collector took inside the target</td>
+</tr>
+<tr>
+<td><code>error</code></td>
+<td>object or <code>null</code></td>
+<td><code>{"type", "message", "traceback"}</code> when it raised</td>
+</tr>
+</tbody>
+</table>
+<h3 id="stacks"><code>stacks</code><a class="headerlink" href="#stacks" title="Permanent link">&para;</a></h3>
+<p>Per-thread call stacks, main thread first and then by thread id.</p>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Type</th>
+<th>Contents</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>thread_count</code></td>
+<td>integer</td>
+<td>Number of threads reported</td>
+</tr>
+<tr>
+<td><code>max_frame_depth</code></td>
+<td>integer</td>
+<td>Frames kept per thread before truncating; currently 128</td>
+</tr>
+<tr>
+<td><code>masking_enabled</code></td>
+<td>boolean</td>
+<td>Whether credential-like locals were replaced with <code>"&lt;masked&gt;"</code> inside the target</td>
+</tr>
+<tr>
+<td><code>threads</code></td>
+<td>array</td>
+<td>One entry per thread</td>
+</tr>
+</tbody>
+</table>
+<p>A thread is:</p>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Type</th>
+<th>Contents</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>thread_id</code></td>
+<td>integer</td>
+<td>The thread's identifier in the target</td>
+</tr>
+<tr>
+<td><code>name</code></td>
+<td>string or <code>null</code></td>
+<td>Thread name; <code>null</code> when it could not be read</td>
+</tr>
+<tr>
+<td><code>daemon</code></td>
+<td>boolean or <code>null</code></td>
+<td>Daemon flag; <code>null</code> on the same terms</td>
+</tr>
+<tr>
+<td><code>is_main</code></td>
+<td>boolean</td>
+<td>Whether this is the target's main thread</td>
+</tr>
+<tr>
+<td><code>frames</code></td>
+<td>array</td>
+<td>Frames, <strong>innermost first</strong></td>
+</tr>
+<tr>
+<td><code>frames_truncated</code></td>
+<td>boolean</td>
+<td>Whether <code>max_frame_depth</code> cut the stack short</td>
+</tr>
+</tbody>
+</table>
+<p>A frame is:</p>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Type</th>
+<th>Contents</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>file</code></td>
+<td>string</td>
+<td><code>co_filename</code> of the running code</td>
+</tr>
+<tr>
+<td><code>line</code></td>
+<td>integer</td>
+<td>Line currently executing</td>
+</tr>
+<tr>
+<td><code>function</code></td>
+<td>string</td>
+<td>Qualified name, so a method reads as <code>Class.method</code></td>
+</tr>
+<tr>
+<td><code>locals</code></td>
+<td>object or <code>null</code></td>
+<td>Variable name to rendered value, both strings; <code>null</code> when the frame refused to expose them</td>
+</tr>
+</tbody>
+</table>
+<p>Every value in <code>locals</code> is a <em>string</em>, never the value itself: it is rendered
+inside the target by the <a href="../reference/#secret-masking">safe-repr
+rules</a> -- 3 levels of nesting, 10 elements per
+container, 200 characters per <code>repr()</code>, 2000 in total, with <code>...</code> or
+<code>...&lt;truncated&gt;</code> marking what was left out.</p>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p><code>name</code> and <code>daemon</code> are <code>null</code> when the thread table could not be read.
+The collector deliberately reads it without taking the lock that protects
+it, because the injected script may have interrupted the very thread that
+holds it, and blocking there would deadlock the target. A missing thread
+name is the price.</p>
+</div>
+<h3 id="objects"><code>objects</code><a class="headerlink" href="#objects" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Type</th>
+<th>Contents</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>top_n</code></td>
+<td>integer</td>
+<td>How many types the ranking keeps; currently 50</td>
+</tr>
+<tr>
+<td><code>total_tracked</code></td>
+<td>integer</td>
+<td>Total GC-tracked objects counted</td>
+</tr>
+<tr>
+<td><code>distinct_types</code></td>
+<td>integer</td>
+<td>How many distinct types were seen, including those outside the ranking</td>
+</tr>
+<tr>
+<td><code>top</code></td>
+<td>array</td>
+<td><code>{"type", "count"}</code> entries, most numerous first</td>
+</tr>
+</tbody>
+</table>
+<p><code>type</code> is the fully qualified name -- <code>app.models.Session</code> -- except for
+builtins, which appear bare (<code>dict</code>, <code>list</code>), and objects whose type refused to
+name itself, counted together as <code>&lt;unknown&gt;</code>.</p>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>Only containers the garbage collector tracks are visible here. Atomic
+values such as <code>int</code>, <code>str</code> and <code>bytes</code> are not counted, so
+<code>total_tracked</code> is not "objects in the process" and a leak of strings
+shows up as growth in whatever holds them.</p>
+</div>
+<h3 id="gc"><code>gc</code><a class="headerlink" href="#gc" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Type</th>
+<th>Contents</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>enabled</code></td>
+<td>boolean</td>
+<td>Whether the cyclic collector is switched on</td>
+</tr>
+<tr>
+<td><code>counts</code></td>
+<td>array of integers</td>
+<td><code>gc.get_count()</code>: allocations outstanding per generation</td>
+</tr>
+<tr>
+<td><code>thresholds</code></td>
+<td>array of integers</td>
+<td><code>gc.get_threshold()</code></td>
+</tr>
+<tr>
+<td><code>generations</code></td>
+<td>array</td>
+<td>One entry per generation</td>
+</tr>
+<tr>
+<td><code>garbage_count</code></td>
+<td>integer</td>
+<td>Length of <code>gc.garbage</code>, i.e. uncollectable objects kept for inspection</td>
+</tr>
+<tr>
+<td><code>freeze_count</code></td>
+<td>integer</td>
+<td><code>gc.get_freeze_count()</code></td>
+</tr>
+</tbody>
+</table>
+<p>A generation entry carries <code>generation</code> (its index) plus whatever
+<code>gc.get_stats()</code> reports for it -- today <code>collections</code>, <code>collected</code> and
+<code>uncollectable</code> -- and the matching <code>count</code> and <code>threshold</code>. Only <code>generation</code>
+is guaranteed: the number of generations and the statistics themselves come
+from the target's own interpreter, which is why they are read rather than
+assumed. The free-threaded build does not use the same layout.</p>
+<h3 id="fds"><code>fds</code><a class="headerlink" href="#fds" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Type</th>
+<th>Contents</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>supported</code></td>
+<td>boolean</td>
+<td><code>false</code> when the platform exposes no readable fd directory</td>
+</tr>
+<tr>
+<td><code>source</code></td>
+<td>string or <code>null</code></td>
+<td>Directory read: <code>/proc/self/fd</code> on Linux, <code>/dev/fd</code> elsewhere</td>
+</tr>
+<tr>
+<td><code>count</code></td>
+<td>integer</td>
+<td>Number of descriptors reported</td>
+</tr>
+<tr>
+<td><code>descriptors</code></td>
+<td>array</td>
+<td>One entry per descriptor, ordered by <code>fd</code></td>
+</tr>
+</tbody>
+</table>
+<p>A descriptor is:</p>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Type</th>
+<th>Contents</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>fd</code></td>
+<td>integer</td>
+<td>Descriptor number</td>
+</tr>
+<tr>
+<td><code>kind</code></td>
+<td>string</td>
+<td>One of <code>socket</code>, <code>fifo</code>, <code>file</code>, <code>directory</code>, <code>char</code>, <code>block</code>, <code>symlink</code>, <code>unknown</code></td>
+</tr>
+<tr>
+<td><code>target</code></td>
+<td>string or <code>null</code></td>
+<td>What the descriptor points at, when it can be resolved</td>
+</tr>
+<tr>
+<td><code>inode</code></td>
+<td>integer</td>
+<td>Inode from <code>fstat</code></td>
+</tr>
+<tr>
+<td><code>is_tty</code></td>
+<td>boolean</td>
+<td>Whether it is a terminal</td>
+</tr>
+<tr>
+<td><code>size</code></td>
+<td>integer</td>
+<td>Present for <code>kind</code> <code>file</code> only</td>
+</tr>
+<tr>
+<td><code>socket</code></td>
+<td>object or <code>null</code></td>
+<td>Present for <code>kind</code> <code>socket</code> only</td>
+</tr>
+</tbody>
+</table>
+<p>Socket details are <code>{"family", "type", "laddr", "raddr"}</code>, where the addresses
+are whatever that family uses -- a <code>[host, port]</code> pair for IP, a path for
+<code>AF_UNIX</code>, <code>null</code> for an unconnected peer.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p><code>socket</code> is <code>null</code> outside Linux, and on Linux when the target has a
+default socket timeout set. The family is read from <code>SO_DOMAIN</code>, which
+only Linux provides, and wrapping a descriptor while a default timeout is
+in force would switch the target's own open file description to
+non-blocking -- observing the process must not change it. The descriptor
+itself is still listed.</p>
+</div>
+<h2 id="validating-a-snapshot">Validating a snapshot<a class="headerlink" href="#validating-a-snapshot" title="Permanent link">&para;</a></h2>
+<p>The schema ships inside the package, so nothing has to be fetched at runtime:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">json</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="kn">import</span><span class="w"> </span><span class="nn">subprocess</span>
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="kn">from</span><span class="w"> </span><span class="nn">jsonschema</span><span class="w"> </span><span class="kn">import</span> <span class="n">validate</span>
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="kn">from</span><span class="w"> </span><span class="nn">pidprobe</span><span class="w"> </span><span class="kn">import</span> <span class="n">snapshot_schema</span>
+<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>
+<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a><span class="n">snapshot</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">subprocess</span><span class="o">.</span><span class="n">run</span><span class="p">(</span>
+<a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a>    <span class="p">[</span><span class="s2">&quot;pidprobe&quot;</span><span class="p">,</span> <span class="s2">&quot;snap&quot;</span><span class="p">,</span> <span class="s2">&quot;12345&quot;</span><span class="p">],</span> <span class="n">capture_output</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">text</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">check</span><span class="o">=</span><span class="kc">True</span>
+<a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a><span class="p">)</span><span class="o">.</span><span class="n">stdout</span><span class="p">)</span>
+<a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a>
+<a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a><span class="n">validate</span><span class="p">(</span><span class="n">instance</span><span class="o">=</span><span class="n">snapshot</span><span class="p">,</span> <span class="n">schema</span><span class="o">=</span><span class="n">snapshot_schema</span><span class="p">())</span>
+</code></pre></div>
+<p><code>snapshot_schema()</code> parses the file afresh on every call, so the returned
+dictionary can be modified -- bundled into a larger schema, say -- without
+affecting anyone else. <code>jsonschema</code> is not a pidprobe dependency; any
+2020-12-capable validator works.</p>
+<p>The schema is also readable straight from the repository as
+<a href="https://github.com/tomada1114/pidprobe/blob/main/src/pidprobe/snapshot.schema.json"><code>src/pidprobe/snapshot.schema.json</code></a>,
+and <code>SCHEMA_VERSION</code> in the public API is the same string every snapshot
+carries.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+  <script>var tabs=__md_get("__tabs");if(Array.isArray(tabs))e:for(var set of document.querySelectorAll(".tabbed-set")){var labels=set.querySelector(".tabbed-labels");for(var tab of tabs)for(var label of labels.getElementsByTagName("label"))if(label.innerText.trim()===tab){var input=document.getElementById(label.htmlFor);input.checked=!0;continue e}}</script>
+
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["content.code.copy", "content.tabs.link", "navigation.instant", "navigation.tracking", "navigation.top", "search.suggest", "search.highlight", "toc.follow"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>
