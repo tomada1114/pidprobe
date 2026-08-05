@@ -46,7 +46,11 @@ for thread in snapshot["stacks"]["threads"]:
     [`pidprobe doctor 12345`](reference.md#command-line) to find out which of
     those applies before probing -- it checks without attaching, and every
     failing check comes with the command to confirm it and the fix.
+    [Troubleshooting](troubleshooting.md) explains each one at length.
 
 ## What's Next?
 
-See the [API Reference](reference.md) for the complete API documentation.
+- [API Reference](reference.md) — every command, option and exit code
+- [Output Schema](output-schema.md) — what the JSON contains, field by field
+- [Collector Plugins](plugins.md) — add a section of your own
+- [Troubleshooting](troubleshooting.md) — when `doctor` says no

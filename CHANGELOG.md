@@ -68,6 +68,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `--timeout` still works and wins over it.
 - `pidprobe --debug`, and `PIDPROBE_DEBUG=1`, to re-raise an unexpected error
   with its traceback instead of summarising it.
+- Documentation: an *Output schema* page describing the `{status, error,
+  payload}` envelope and every field of every snapshot section, and a
+  *Troubleshooting* page with one section per `pidprobe doctor` check, under
+  the check's own name and in the order the report prints them. The plugin
+  guide gained the collector contract, how to see what discovery found, and
+  how to run a collector without a target. A test asserts docs and code agree
+  on the check names, their order, the exit code table and the subcommands.
 
 ### Changed
 

@@ -126,22 +126,13 @@ Every check that fails or warns carries all four of the things you need: which
 check it was, the *cause*, a *confirm* command you can run yourself, and the
 *fix*. The type rejects a check built without them, so no diagnosis can come
 back as a bare "Permission denied".
-`--json` prints the same report as `{"pid", "attachable", "checks"}` for
+`--json` prints the same report as
+[`{"pid", "attachable", "checks"}`](troubleshooting.md#the-json-report) for
 tooling.
 
-| Check | What it answers |
-| --- | --- |
-| `prober_remote_debug` | Can this interpreter call `sys.remote_exec` at all? |
-| `return_channel` | Can a channel be created for the target to answer on? |
-| `collector_plugins` | Did every installed collector plugin load? |
-| `ptrace_scope` | Does the Linux Yama policy permit attaching? |
-| `task_for_pid` | Does macOS grant this user the target's task port? |
-| `target_process` | Does the pid exist and may this user signal it? |
-| `target_owner` | Do prober and target run as the same user? |
-| `pid_namespace` | Is there a container boundary between them? |
-| `target_python_version` | Is the target CPython 3.14+? |
-| `target_python_match` | Do both sides share a CPython feature release? |
-| `target_remote_debug` | Was the target started with `PYTHON_DISABLE_REMOTE_DEBUG`? |
+[Troubleshooting](troubleshooting.md) has one section per check, under the
+same names and in the same order the report prints them, so a failing check
+reads straight across into the page that explains it.
 
 !!! note
 
@@ -183,22 +174,23 @@ what went wrong without parsing the message:
 
 | Code | Meaning |
 | --- | --- |
-| `0` | Success |
-| `1` | The probe failed for a reason with no more specific code |
-| `2` | Invalid command line |
-| `3` | No such process |
-| `4` | Attaching to the target was refused |
-| `5` | The target did not answer within the timeout |
-| `6` | The injected code raised inside the target |
-| `7` | `doctor` found a check that blocks attaching |
-| `70` | pidprobe hit an unexpected error — a bug |
-| `130` | Interrupted with Ctrl-C |
-| `141` | The reader of stdout closed the pipe |
+| `0` | success |
+| `1` | probe failed for a reason with no more specific code |
+| `2` | invalid command line |
+| `3` | no such process |
+| `4` | attaching to the target was refused |
+| `5` | the target did not answer within the timeout |
+| `6` | the injected code raised inside the target |
+| `7` | doctor found a check that blocks attaching |
+| `70` | pidprobe hit an unexpected error (a bug) |
+| `130` | interrupted with Ctrl-C |
+| `141` | the reader of stdout closed the pipe |
 
-`pidprobe --help` prints the same table. The failure is explained on stderr as
-a single `pidprobe: ...` line for `snap`, `eval` and `diff`; `doctor` prints
-its report to stdout whatever it says, because the report *is* its output, and
-only the exit code separates a clean environment from a blocked one.
+`pidprobe --help` prints the same table, word for word: both are rendered from
+one list in the code. The failure itself is explained on stderr as a single
+`pidprobe: ...` line for `snap`, `eval` and `diff`; `doctor` prints its report
+to stdout whatever it says, because the report *is* its output, and only the
+exit code separates a clean environment from a blocked one.
 
 !!! note
 
@@ -231,14 +223,9 @@ one section per collector, named after that collector:
     `null` and the reason is reported in `meta.collectors`. The rest of the
     snapshot still comes back.
 
-The format is described by a JSON Schema shipped inside the package, so
-downstream tooling can validate the output with any JSON Schema validator:
-
-```python
-from pidprobe import snapshot_schema
-
-schema = snapshot_schema()
-```
+[Output schema](output-schema.md) documents every field of every section, the
+`{status, error, payload}` envelope underneath them, and how to validate a
+snapshot against the JSON Schema the package ships.
 
 !!! warning
 
@@ -330,22 +317,9 @@ redis = "my_package.collectors:REDIS"
 ```
 
 The entry point resolves either to a collector or to a zero-argument callable
-returning one:
-
-```python
-from pidprobe import Collector
-
-REDIS = Collector(
-    name="redis",
-    source="""
-import sys
-
-module = sys.modules.get("redis")
-data = {"available": module is not None}
-""",
-    description="whether the target has Redis loaded",
-)
-```
+returning one. What it resolves to carries `name`, `source` and `description`
+strings -- a `Collector`, or anything else matching the `CollectorSpec`
+protocol.
 
 `source` does not run in the prober. It becomes a function body inside the
 *target* process and must assign a JSON-serializable value to `data`, which is
@@ -358,21 +332,13 @@ one. The JSON Schema allows unknown top-level keys for exactly this reason.
     `source` must not `import` the library it reports on. The import would
     run inside the target and load a package that process never asked for,
     changing what you were trying to observe. Look the module up in
-    `sys.modules` instead, as above, and report `"available": false` when it
-    is not there. [Writing a collector plugin](plugins.md) covers the rest of
-    the rules.
+    `sys.modules` instead and report `"available": false` when it is not
+    there. [Writing a collector plugin](plugins.md) has the worked example and
+    the rest of the rules.
 
-`Collector` is a convenience, not a requirement: `CollectorSpec` is the typed
-protocol discovery accepts, so any object carrying `name`, `source` and
-`description` strings qualifies. What a snapshot would run is available
-without probing anything:
-
-```python
-from pidprobe import available_collectors, discover_collectors
-
-print([collector.name for collector in available_collectors()])
-print([collector.name for collector in discover_collectors()])
-```
+What a snapshot would run is available without probing anything, through
+`available_collectors()` for the built-ins plus the plugins and
+`discover_collectors()` for the plugins alone.
 
 !!! note
 
