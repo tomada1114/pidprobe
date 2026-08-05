@@ -4,9 +4,9 @@
 [![codecov](https://codecov.io/gh/tomada1114/pidprobe/branch/main/graph/badge.svg)](https://codecov.io/gh/tomada1114/pidprobe)
 [![PyPI](https://img.shields.io/pypi/v/pidprobe)](https://pypi.org/project/pidprobe/)
 [![Python](https://img.shields.io/pypi/pyversions/pidprobe)](https://pypi.org/project/pidprobe/)
-[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/tomada1114/pidprobe/blob/main/LICENSE)
 
-![A hung FastAPI request, then pidprobe snap piped into jq, naming the two deadlocked threads and the connection pool they stranded](docs/assets/demo.gif)
+![A hung FastAPI request, then pidprobe snap piped into jq, naming the two deadlocked threads and the connection pool they stranded](https://raw.githubusercontent.com/tomada1114/pidprobe/main/docs/assets/demo.gif)
 
 **Ask a running CPython 3.14+ process what it is stuck on and get one JSON
 document back — no agent, no restart, no gdb.**
@@ -176,8 +176,8 @@ section.
 ## Contributing
 
 pidprobe has zero runtime dependencies and intends to keep it that way. See
-[CONTRIBUTING.md](CONTRIBUTING.md) for the full setup;
-[`just check`](justfile) runs format, lint, type check and tests.
+[CONTRIBUTING.md](https://github.com/tomada1114/pidprobe/blob/main/CONTRIBUTING.md) for the full setup;
+[`just check`](https://github.com/tomada1114/pidprobe/blob/main/justfile) runs format, lint, type check and tests.
 
 ```bash
 uv sync --all-groups
@@ -187,4 +187,4 @@ just check
 
 ## License
 
-[MIT](LICENSE)
+[MIT](https://github.com/tomada1114/pidprobe/blob/main/LICENSE)
