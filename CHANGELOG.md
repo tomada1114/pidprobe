@@ -40,6 +40,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   a fix -- enforced by `Check` itself, which refuses to be built without them.
   Text by default, `--json` for tooling, exit code `1` when a check blocks
   attaching. Every `snap` and `eval` failure now names `pidprobe doctor <PID>`.
+- `pidprobe diff <PID> --interval S [--count N]`, plus `iter_snapshot_deltas()`
+  and `diff_snapshots()`: repeated snapshots reduced to what changed between
+  them -- object counts per type ranked by growth, GC generation statistics
+  and the open file descriptor count. Each delta is printed as one JSON line
+  as soon as it is ready, `--count N` yields `N - 1` deltas, and without
+  `--count` the series runs until Ctrl-C ends it with exit code `130`. Only
+  the `objects`, `gc` and `fds` collectors run, so a sample costs the target
+  less than a full snapshot.
 - `sqlalchemy` section: the reference collector plugin reports every
   connection pool the target holds with its size, checked-out count and
   overflow, and `"available": false` when the target never imported

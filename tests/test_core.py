@@ -41,8 +41,10 @@ class TestPackageMetadata:
             "add",
             "available_collectors",
             "diagnose",
+            "diff_snapshots",
             "discover_collectors",
             "evaluate_in_target",
+            "iter_snapshot_deltas",
             "snapshot_schema",
             "take_snapshot",
         }

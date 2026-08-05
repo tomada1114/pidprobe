@@ -1,47 +1,43 @@
 """Command-line interface for pidprobe.
 
 Every subcommand is registered in :func:`build_parser` and dispatched through
-the ``handler`` default it sets, so adding one means adding a parser and a
-handler function -- nothing in :func:`main` changes.
+the ``handler`` default it sets, so adding one means adding a parser here and
+a handler in :mod:`pidprobe._commands` -- nothing in :func:`main` changes.
 """
 
 from __future__ import annotations
 
 import argparse
-import json
+import math
 import sys
 from typing import TYPE_CHECKING, Any
 
 from ._channel import DEFAULT_TIMEOUT_SECONDS
-from ._diagnosis import as_document, render_text
-from ._doctor import diagnose
+from ._commands import (
+    EXIT_INTERRUPTED,
+    EXIT_OK,
+    EXIT_PROBE_ERROR,
+    run_diff,
+    run_doctor,
+    run_eval,
+    run_snap,
+)
 from ._errors import ProbeError
-from ._eval import evaluate_in_target
-from ._snapshot import take_snapshot
-from .collectors._stacks import build_stacks_collector
-from .registry import available_collectors
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Mapping, Sequence
-
-    from .collectors import Collector
-
-
-EXIT_OK = 0
-"""Exit code for a snapshot that was collected and printed."""
-
-EXIT_PROBE_ERROR = 1
-"""Exit code for a probe that failed: attach, timeout, channel or target.
-
-``doctor`` reuses it for a diagnosis that found a blocking check, so "a probe
-of this pid would not work" is one exit code however it was discovered.
-"""
+    from collections.abc import Callable, Sequence
 
 _DOCTOR_HINT = "run `pidprobe doctor {pid}` for attach diagnostics"
 
-_PRETTY_INDENT = 2
-_COMPACT_SEPARATORS = (",", ":")
 _PROGRAM_NAME = "pidprobe"
+
+__all__ = [
+    "EXIT_INTERRUPTED",
+    "EXIT_OK",
+    "EXIT_PROBE_ERROR",
+    "build_parser",
+    "main",
+]
 
 
 def _positive_int(value: str) -> int:
@@ -62,88 +58,28 @@ def _positive_int(value: str) -> int:
 
 
 def _positive_float(value: str) -> float:
-    """Parse a strictly positive float argument.
+    """Parse a strictly positive, finite float argument.
+
+    Infinity and NaN are rejected rather than passed on: ``nan`` compares
+    false against every bound, so it would slip through as a duration that
+    never elapses and never times out.
 
     Raises:
-        ArgumentTypeError: If the value is not a positive number.
+        ArgumentTypeError: If the value is not a positive, finite number.
     """
     try:
         number = float(value)
     except ValueError:
         message = f"expected a number, got {value!r}"
         raise argparse.ArgumentTypeError(message) from None
-    if number <= 0:
+    if not math.isfinite(number) or number <= 0:
         message = f"expected a positive number, got {number}"
         raise argparse.ArgumentTypeError(message)
     return number
 
 
-def _write_json(document: Mapping[str, Any], *, is_pretty: bool) -> None:
-    """Write a JSON document to stdout, compact by default."""
-    if is_pretty:
-        text = json.dumps(document, indent=_PRETTY_INDENT)
-    else:
-        text = json.dumps(document, separators=_COMPACT_SEPARATORS)
-    sys.stdout.write(f"{text}\n")
-
-
-def _snap_collectors(*, is_masked: bool) -> tuple[Collector, ...] | None:
-    """Return the collectors ``snap`` runs, or ``None`` for the defaults.
-
-    Masking is baked into the stacks collector's generated source, so turning
-    it off means swapping that one collector for an unmasked build and leaving
-    every other collector -- discovered plugins included -- exactly as it is.
-    """
-    if is_masked:
-        return None
-    unmasked = build_stacks_collector(is_masked=False)
-    return tuple(
-        unmasked if collector.name == unmasked.name else collector
-        for collector in available_collectors()
-    )
-
-
-def _run_snap(args: argparse.Namespace) -> int:
-    """Take one snapshot and print it."""
-    snapshot = take_snapshot(
-        args.pid,
-        timeout_seconds=args.timeout,
-        collectors=_snap_collectors(is_masked=args.is_masked),
-    )
-    _write_json(snapshot, is_pretty=args.pretty)
-    return EXIT_OK
-
-
-def _run_eval(args: argparse.Namespace) -> int:
-    """Evaluate one expression in the target and print the result."""
-    evaluation = evaluate_in_target(
-        args.pid,
-        args.expression,
-        timeout_seconds=args.timeout,
-        is_masked=args.is_masked,
-    )
-    _write_json(evaluation, is_pretty=args.pretty)
-    return EXIT_OK
-
-
-def _run_doctor(args: argparse.Namespace) -> int:
-    """Run the attach preflight checks and print the report."""
-    diagnosis = diagnose(args.pid)
-    if args.as_json:
-        _write_json(as_document(diagnosis), is_pretty=args.pretty)
-    else:
-        sys.stdout.write(render_text(diagnosis))
-    return EXIT_OK if diagnosis.is_attachable else EXIT_PROBE_ERROR
-
-
-def _add_common_options(parser: argparse.ArgumentParser, *, mask_help: str) -> None:
-    """Add the options every probing subcommand shares.
-
-    Args:
-        parser: Subcommand parser to extend.
-        mask_help: What ``--no-mask`` does in this subcommand, phrased as the
-            first clause of its help text.
-    """
+def _add_common_options(parser: argparse.ArgumentParser) -> None:
+    """Add the options every probing subcommand shares."""
     parser.add_argument(
         "--pretty",
         action="store_true",
@@ -158,6 +94,16 @@ def _add_common_options(parser: argparse.ArgumentParser, *, mask_help: str) -> N
             f"hard budget for the whole probe (default: {DEFAULT_TIMEOUT_SECONDS:g})"
         ),
     )
+
+
+def _add_mask_option(parser: argparse.ArgumentParser, *, mask_help: str) -> None:
+    """Add ``--no-mask`` to a subcommand that reports values from the target.
+
+    Args:
+        parser: Subcommand parser to extend.
+        mask_help: What ``--no-mask`` does in this subcommand, phrased as the
+            first clause of its help text.
+    """
     parser.add_argument(
         "--no-mask",
         dest="is_masked",
@@ -181,11 +127,12 @@ def _add_snap_parser(subcommands: argparse._SubParsersAction[Any]) -> None:
         ),
     )
     snap.add_argument("pid", type=_positive_int, help="process id of the target")
-    _add_common_options(
+    _add_common_options(snap)
+    _add_mask_option(
         snap,
         mask_help="show credential-like locals instead of masking them",
     )
-    snap.set_defaults(handler=_run_snap)
+    snap.set_defaults(handler=run_snap)
 
 
 def _add_eval_parser(subcommands: argparse._SubParsersAction[Any]) -> None:
@@ -206,11 +153,48 @@ def _add_eval_parser(subcommands: argparse._SubParsersAction[Any]) -> None:
         metavar="EXPR",
         help="Python expression to evaluate inside the target",
     )
-    _add_common_options(
+    _add_common_options(evaluate)
+    _add_mask_option(
         evaluate,
         mask_help="show a credential-like result instead of masking it",
     )
-    evaluate.set_defaults(handler=_run_eval)
+    evaluate.set_defaults(handler=run_eval)
+
+
+def _add_diff_parser(subcommands: argparse._SubParsersAction[Any]) -> None:
+    """Register the ``diff`` subcommand."""
+    diff = subcommands.add_parser(
+        "diff",
+        help="report what changed between repeated snapshots of a process",
+        description=(
+            "Sample a running process every --interval seconds and print only "
+            "what moved between two consecutive samples: object counts per "
+            "type, ranked by growth, garbage collector statistics and the "
+            "number of open file descriptors. Each delta is printed as one "
+            "JSON line as soon as it is ready, so a leak can be watched "
+            "growing. Only the objects, gc and fds collectors run."
+        ),
+    )
+    diff.add_argument("pid", type=_positive_int, help="process id of the target")
+    diff.add_argument(
+        "--interval",
+        type=_positive_float,
+        required=True,
+        metavar="SECONDS",
+        help="seconds between the starts of two consecutive snapshots",
+    )
+    diff.add_argument(
+        "--count",
+        type=_positive_int,
+        default=None,
+        metavar="N",
+        help=(
+            "number of snapshots to take, which yields N-1 deltas; omit to "
+            "keep sampling until interrupted with Ctrl-C"
+        ),
+    )
+    _add_common_options(diff)
+    diff.set_defaults(handler=run_diff)
 
 
 def _add_doctor_parser(subcommands: argparse._SubParsersAction[Any]) -> None:
@@ -243,7 +227,7 @@ def _add_doctor_parser(subcommands: argparse._SubParsersAction[Any]) -> None:
         action="store_true",
         help="indent the JSON; only meaningful together with --json",
     )
-    doctor.set_defaults(handler=_run_doctor)
+    doctor.set_defaults(handler=run_doctor)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -269,6 +253,7 @@ def build_parser() -> argparse.ArgumentParser:
     subcommands = parser.add_subparsers(dest="command", required=True)
     _add_snap_parser(subcommands)
     _add_eval_parser(subcommands)
+    _add_diff_parser(subcommands)
     _add_doctor_parser(subcommands)
     return parser
 
@@ -296,12 +281,16 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     Returns:
         The process exit code. Probe failures print their explanation to
-        stderr and return :data:`EXIT_PROBE_ERROR`.
+        stderr and return :data:`EXIT_PROBE_ERROR`; Ctrl-C ends the command
+        without a traceback and returns :data:`EXIT_INTERRUPTED`.
     """
     args = build_parser().parse_args(argv)
     handler: Callable[[argparse.Namespace], int] = args.handler
     try:
         return handler(args)
+    except KeyboardInterrupt:
+        sys.stderr.write(f"{_PROGRAM_NAME}: interrupted\n")
+        return EXIT_INTERRUPTED
     except ProbeError as exc:
         sys.stderr.write(
             f"{_PROGRAM_NAME}: {_explain(exc, getattr(args, 'pid', None))}\n"
