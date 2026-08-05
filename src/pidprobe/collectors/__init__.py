@@ -1,8 +1,10 @@
 """Built-in collectors and the registration point for the snapshot sections.
 
-:data:`BUILTIN_COLLECTORS` is the single ordered list of everything
-``pidprobe snap`` collects; adding a section means adding a
-:class:`~pidprobe.collectors._base.Collector` here.
+:data:`BUILTIN_COLLECTORS` is the single ordered list of the sections this
+package ships; adding one means adding a
+:class:`~pidprobe.collectors._base.Collector` here. What a snapshot actually
+runs -- these plus every installed plugin -- comes from
+:func:`pidprobe.registry.available_collectors`.
 """
 
 from __future__ import annotations

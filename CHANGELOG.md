@@ -22,6 +22,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   credential (`password`, `token`, `api_key`, ...) with `"<masked>"`. Masking
   runs inside the target, is on by default, is reported as
   `stacks.masking_enabled`, and is turned off with `pidprobe snap --no-mask`.
+- Collector plugin API: any package can add a snapshot section by publishing an
+  entry point in the `pidprobe.collectors` group. `CollectorSpec` is the typed
+  contract, `Collector`, `available_collectors()` and `discover_collectors()`
+  round out the public API, and a plugin that fails to load or raises inside
+  the target costs only its own section.
 
 ## [0.0.1] - 2026-08-04
 

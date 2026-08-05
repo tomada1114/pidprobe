@@ -13,6 +13,9 @@ from typing import IO, TYPE_CHECKING, Any
 
 import pytest
 
+from pidprobe import _snapshot as snapshot_module
+from pidprobe._envelope import Envelope
+
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterator
     from types import FrameType
@@ -64,6 +67,23 @@ def _wait_for_ready(stream: IO[str], timeout: float) -> None:
             pytest.fail("target process exited before printing READY")
         if line.strip() == "READY":
             return
+
+
+@pytest.fixture
+def local_target(monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
+    """Run the injected source in this process instead of a remote target.
+
+    Returns a dict that records what the channel was asked to do, so tests can
+    assert on the arguments ``take_snapshot`` passed on.
+    """
+    calls: dict[str, Any] = {}
+
+    def fake_execute(pid: int, source: str, **kwargs: Any) -> Envelope:
+        calls.update(pid=pid, source=source, **kwargs)
+        return Envelope(status="ok", error=None, payload=run_collector_source(source))
+
+    monkeypatch.setattr(snapshot_module, "execute_in_target", fake_execute)
+    return calls
 
 
 @pytest.fixture

@@ -6,7 +6,8 @@
 pidprobe snap <PID> [--pretty] [--timeout SECONDS] [--no-mask]
 ```
 
-`snap` injects the built-in collectors into a running CPython 3.14+ process
+`snap` injects the built-in collectors -- plus every installed
+[collector plugin](#collector-plugins) -- into a running CPython 3.14+ process
 and prints one JSON snapshot. The default output is a single compact line so
 it can be piped straight into `jq`; `--pretty` indents it instead.
 `--timeout` (default: 5 seconds) is a hard budget for the whole probe.
@@ -66,6 +67,60 @@ schema = snapshot_schema()
 
     `objects` only counts containers the garbage collector tracks. Atomic
     values such as `int` and `str` are invisible to it and are not counted.
+
+## Collector plugins
+
+A section can come from any installed package, not only from pidprobe. Publish
+an entry point in the `pidprobe.collectors` group:
+
+```toml
+[project.entry-points."pidprobe.collectors"]
+sqlalchemy = "pidprobe_sqlalchemy:COLLECTOR"
+```
+
+The entry point resolves either to a collector or to a zero-argument callable
+returning one:
+
+```python
+from pidprobe import Collector
+
+COLLECTOR = Collector(
+    name="sqlalchemy",
+    source="""
+import sqlalchemy
+
+data = {"version": sqlalchemy.__version__}
+""",
+    description="SQLAlchemy engine and pool state",
+)
+```
+
+`source` does not run in the prober. It becomes a function body inside the
+*target* process and must assign a JSON-serializable value to `data`, which is
+published as the top-level section named after `name` — next to `stacks`,
+`objects`, `gc` and `fds`, and reported in `meta.collectors` like any built-in
+one. The JSON Schema allows unknown top-level keys for exactly this reason.
+
+`Collector` is a convenience, not a requirement: `CollectorSpec` is the typed
+protocol discovery accepts, so any object carrying `name`, `source` and
+`description` strings qualifies. What a snapshot would run is available
+without probing anything:
+
+```python
+from pidprobe import available_collectors, discover_collectors
+
+print([collector.name for collector in available_collectors()])
+print([collector.name for collector in discover_collectors()])
+```
+
+!!! note
+
+    Discovery never fails a snapshot. A plugin that cannot be imported, hands
+    back something that is not a collector, carries source that does not
+    compile, or claims a name a built-in or an earlier plugin already took is
+    logged on the `pidprobe.registry` logger and left out; every other section
+    still comes back. A plugin that raises *inside the target* costs only its
+    own section, exactly like a built-in.
 
 ## Python API
 

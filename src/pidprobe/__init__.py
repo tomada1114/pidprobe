@@ -13,7 +13,14 @@ from ._errors import (
 )
 from ._schema import SCHEMA_VERSION, snapshot_schema
 from ._snapshot import take_snapshot
+from .collectors import Collector
 from .core import add
+from .registry import (
+    COLLECTOR_ENTRY_POINT_GROUP,
+    CollectorSpec,
+    available_collectors,
+    discover_collectors,
+)
 
 try:
     __version__ = version("pidprobe")
@@ -21,14 +28,19 @@ except PackageNotFoundError:
     __version__ = "0.0.0+unknown"
 
 __all__ = [
+    "COLLECTOR_ENTRY_POINT_GROUP",
     "SCHEMA_VERSION",
     "AttachError",
     "ChannelError",
+    "Collector",
+    "CollectorSpec",
     "ProbeError",
     "ProbeTimeoutError",
     "TargetError",
     "__version__",
     "add",
+    "available_collectors",
+    "discover_collectors",
     "snapshot_schema",
     "take_snapshot",
 ]

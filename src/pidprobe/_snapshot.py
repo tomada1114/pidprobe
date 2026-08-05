@@ -16,7 +16,8 @@ from typing import TYPE_CHECKING, Any
 from ._channel import DEFAULT_TIMEOUT_SECONDS, execute_in_target
 from ._errors import ChannelError, TargetError
 from ._schema import SCHEMA_VERSION
-from .collectors import BUILTIN_COLLECTORS, compose_collector_source
+from .collectors import compose_collector_source
+from .registry import available_collectors
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -45,7 +46,9 @@ def take_snapshot(
         pid: Target process id.
         timeout_seconds: Hard budget covering injection and read-back.
         collectors: Collectors to run; defaults to
-            :data:`~pidprobe.collectors.BUILTIN_COLLECTORS`.
+            :func:`~pidprobe.registry.available_collectors`, the built-in
+            collectors plus every plugin published in the
+            ``pidprobe.collectors`` entry point group.
         allow_socket: Set to ``False`` to force the tempfile return channel.
 
     Returns:
@@ -58,7 +61,7 @@ def take_snapshot(
         ChannelError: If the answer does not match the envelope contract.
         TargetError: If the injected code failed as a whole inside the target.
     """
-    chosen = BUILTIN_COLLECTORS if collectors is None else tuple(collectors)
+    chosen = available_collectors() if collectors is None else tuple(collectors)
     source = compose_collector_source(chosen)
     started = time.perf_counter()
     envelope = execute_in_target(

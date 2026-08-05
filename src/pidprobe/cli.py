@@ -15,8 +15,8 @@ from typing import TYPE_CHECKING, Any
 from ._channel import DEFAULT_TIMEOUT_SECONDS
 from ._errors import ProbeError
 from ._snapshot import take_snapshot
-from .collectors import BUILTIN_COLLECTORS
 from .collectors._stacks import build_stacks_collector
+from .registry import available_collectors
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Sequence
@@ -83,14 +83,14 @@ def _snap_collectors(*, is_masked: bool) -> tuple[Collector, ...] | None:
 
     Masking is baked into the stacks collector's generated source, so turning
     it off means swapping that one collector for an unmasked build and leaving
-    every other collector exactly as it is.
+    every other collector -- discovered plugins included -- exactly as it is.
     """
     if is_masked:
         return None
     unmasked = build_stacks_collector(is_masked=False)
     return tuple(
         unmasked if collector.name == unmasked.name else collector
-        for collector in BUILTIN_COLLECTORS
+        for collector in available_collectors()
     )
 
 
@@ -131,9 +131,9 @@ def build_parser() -> argparse.ArgumentParser:
         "snap",
         help="collect one snapshot of a running process",
         description=(
-            "Inject the built-in collectors into a running process and print "
-            "one JSON snapshot of its threads, objects, GC state and open "
-            "file descriptors."
+            "Inject the built-in collectors, plus any installed collector "
+            "plugin, into a running process and print one JSON snapshot of "
+            "its threads, objects, GC state and open file descriptors."
         ),
     )
     snap.add_argument("pid", type=_positive_int, help="process id of the target")

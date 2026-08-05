@@ -24,14 +24,19 @@ class TestAdd:
 class TestPackageMetadata:
     def test_public_exports(self):
         assert set(__all__) == {
+            "COLLECTOR_ENTRY_POINT_GROUP",
             "SCHEMA_VERSION",
             "AttachError",
             "ChannelError",
+            "Collector",
+            "CollectorSpec",
             "ProbeError",
             "ProbeTimeoutError",
             "TargetError",
             "__version__",
             "add",
+            "available_collectors",
+            "discover_collectors",
             "snapshot_schema",
             "take_snapshot",
         }

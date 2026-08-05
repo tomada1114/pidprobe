@@ -79,6 +79,33 @@ nesting, 10 elements per container, 200 characters per `repr()` and 2000
 characters in total. Anything left out is shown as `...` or
 `...<truncated>`, so one pathological object cannot blow up a snapshot.
 
+## Collector plugins
+
+Any package can add its own section to every snapshot by publishing an entry
+point in the `pidprobe.collectors` group:
+
+```toml
+[project.entry-points."pidprobe.collectors"]
+sqlalchemy = "pidprobe_sqlalchemy:COLLECTOR"
+```
+
+```python
+from pidprobe import Collector
+
+COLLECTOR = Collector(
+    name="sqlalchemy",
+    source='import sqlalchemy\n\ndata = {"version": sqlalchemy.__version__}',
+    description="SQLAlchemy engine and pool state",
+)
+```
+
+`source` runs inside the *target* process and assigns `data`, which becomes the
+`sqlalchemy` section of the snapshot. A plugin that fails to load, or that
+raises inside the target, costs only its own section — every other collector
+still reports. See the
+[API Reference](https://tomada1114.github.io/pidprobe/reference/#collector-plugins)
+for the full contract.
+
 ## Design Philosophy
 
 Every choice in this template has a reason. If you disagree with a decision,
