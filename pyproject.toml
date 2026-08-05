@@ -4,20 +4,41 @@ build-backend = "hatchling.build"
 
 [project]
 name = "pidprobe"
-version = "0.0.1"
+version = "0.1.0"
 description = "Structured JSON snapshots of running CPython 3.14+ processes via PEP 768 - no agent, no restart, no gdb"
 readme = "README.md"
 requires-python = ">=3.14"
 license = "MIT"
 license-files = ["LICENSE"]
 authors = [{ name = "tomada", email = "tmasuyama1114@gmail.com" }]
-keywords = []
+keywords = [
+    "debugging",
+    "diagnostics",
+    "introspection",
+    "pep768",
+    "remote-exec",
+    "traceback",
+    "thread-dump",
+    "deadlock",
+    "memory-leak",
+    "observability",
+]
+# No `License ::` classifier: this project declares its licence with the PEP 639
+# `license`/`license-files` fields above, which build into a `License-Expression`
+# metadata field. PyPI rejects a distribution that carries both.
 classifiers = [
     "Development Status :: 3 - Alpha",
+    "Environment :: Console",
     "Intended Audience :: Developers",
+    "Intended Audience :: System Administrators",
+    "Operating System :: MacOS",
+    "Operating System :: POSIX :: Linux",
     "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
     "Programming Language :: Python :: 3.14",
     "Programming Language :: Python :: 3.15",
+    "Topic :: Software Development :: Debuggers",
+    "Topic :: System :: Monitoring",
     "Typing :: Typed",
 ]
 
@@ -64,7 +85,7 @@ docs = ["mkdocs-material>=9.7.6", "mkdocstrings[python]>=1.0.4"]
 # --------------------------------------------------------------------------- #
 
 [tool.uv]
-exclude-newer = "2026-06-18T00:00:00Z"
+exclude-newer = "2026-07-22T00:00:00Z"
 
 # --------------------------------------------------------------------------- #
 #  Build
