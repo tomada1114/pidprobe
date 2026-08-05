@@ -34,8 +34,8 @@ pidprobe snap 12345 --pretty        # indented, for humans
 
 A snapshot carries a `meta` section (both Python versions, the measured stop
 duration, the pidprobe version, the output `schema_version`) plus one section
-per collector: `stacks`, `objects`, `gc` and `fds`. The output format is
-described by a JSON Schema that ships with the package.
+per collector: `stacks`, `objects`, `gc`, `fds` and `sqlalchemy`. The output
+format is described by a JSON Schema that ships with the package.
 
 The same thing from Python:
 
@@ -127,7 +127,9 @@ COLLECTOR = Collector(
 raises inside the target, costs only its own section — every other collector
 still reports. See the
 [API Reference](https://tomada1114.github.io/pidprobe/reference/#collector-plugins)
-for the full contract.
+for the full contract, and
+[Writing a collector plugin](https://tomada1114.github.io/pidprobe/plugins/)
+for the shipped `sqlalchemy` collector as a worked example.
 
 ## Design Philosophy
 

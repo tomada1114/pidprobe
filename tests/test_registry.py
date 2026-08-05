@@ -44,6 +44,12 @@ EXPLODING = Collector(
 
 BUILTIN_NAMES = [collector.name for collector in BUILTIN_COLLECTORS]
 
+# pidprobe publishes its own reference plugin in the collector entry point
+# group, so the tests that install a real distribution -- instead of
+# monkeypatching discovery -- see it alongside the test plugin, ordered after
+# "dummy" by entry point name.
+SHIPPED_PLUGIN_NAMES = ["sqlalchemy"]
+
 # Written to disk and imported by the tests that install a real distribution,
 # so discovery goes through importlib.metadata exactly as it does for a plugin
 # a user installed with pip.
@@ -172,6 +178,7 @@ class TestInstalledPlugin:
         assert [report["name"] for report in snapshot["meta"]["collectors"]] == [
             *BUILTIN_NAMES,
             "dummy",
+            *SHIPPED_PLUGIN_NAMES,
         ]
 
     def test_plugin_that_fails_to_load_leaves_every_other_section_intact(
@@ -189,7 +196,7 @@ class TestInstalledPlugin:
         assert all(snapshot[name] is not None for name in BUILTIN_NAMES)
         assert [report["status"] for report in snapshot["meta"]["collectors"]] == [
             "ok",
-        ] * (len(BUILTIN_NAMES) + 1)
+        ] * (len(BUILTIN_NAMES) + 1 + len(SHIPPED_PLUGIN_NAMES))
         assert "this plugin is broken" in caplog.text
 
     def test_plugin_raising_inside_the_target_only_nulls_its_own_section(

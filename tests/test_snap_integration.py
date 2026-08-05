@@ -16,7 +16,7 @@ from typing import TYPE_CHECKING, Any
 import fastjsonschema
 import pytest
 
-from pidprobe import snapshot_schema, take_snapshot
+from pidprobe import available_collectors, snapshot_schema, take_snapshot
 from pidprobe.cli import EXIT_OK, main
 
 if TYPE_CHECKING:
@@ -58,12 +58,10 @@ def test_snapshot_of_a_live_target_matches_the_schema(
     validate_snapshot(snapshot)
     assert snapshot["meta"]["pid"] == proc.pid
     assert snapshot["meta"]["target"]["pid"] == proc.pid
-    assert [report["status"] for report in snapshot["meta"]["collectors"]] == [
-        "ok",
-        "ok",
-        "ok",
-        "ok",
+    assert [report["name"] for report in snapshot["meta"]["collectors"]] == [
+        collector.name for collector in available_collectors()
     ]
+    assert all(report["status"] == "ok" for report in snapshot["meta"]["collectors"])
 
 
 def test_healthy_target_snapshot_completes_within_a_second(

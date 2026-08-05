@@ -21,8 +21,22 @@ classifiers = [
     "Typing :: Typed",
 ]
 
+[project.optional-dependencies]
+# The SQLAlchemy collector never imports SQLAlchemy in the prober -- it reads
+# the *target* process' own pools. This extra exists so `pidprobe[sqlalchemy]`
+# installs into an environment that can also run the documented example.
+sqlalchemy = ["sqlalchemy>=2.0"]
+
 [project.scripts]
 pidprobe = "pidprobe.cli:main"
+
+# The reference plugin ships inside pidprobe and is registered like any
+# third-party one, so it goes through the same discovery path a user's plugin
+# does. It reports an unavailable section instead of failing when the target
+# has no SQLAlchemy loaded, which is why registering it unconditionally is
+# safe for users who never installed the extra.
+[project.entry-points."pidprobe.collectors"]
+sqlalchemy = "pidprobe.plugins.sqlalchemy_pool:SQLALCHEMY_POOL_COLLECTOR"
 
 [project.urls]
 Homepage = "https://github.com/tomada1114/pidprobe"
@@ -39,6 +53,9 @@ dev = [
     "pytest>=8.0",
     "pytest-cov>=7.1.0",
     "ruff>=0.11",
+    # Mirrors the `sqlalchemy` extra: the reference plugin's tests need a real
+    # engine and pool, both in this process and in a spawned target.
+    "sqlalchemy>=2.0",
 ]
 docs = ["mkdocs-material>=9.7.6", "mkdocstrings[python]>=1.0.4"]
 

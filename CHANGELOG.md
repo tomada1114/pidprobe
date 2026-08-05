@@ -30,6 +30,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   contract, `Collector`, `available_collectors()` and `discover_collectors()`
   round out the public API, and a plugin that fails to load or raises inside
   the target costs only its own section.
+- `sqlalchemy` section: the reference collector plugin reports every
+  connection pool the target holds with its size, checked-out count and
+  overflow, and `"available": false` when the target never imported
+  SQLAlchemy.
 
 ## [0.0.1] - 2026-08-04
 

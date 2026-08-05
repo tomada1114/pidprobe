@@ -78,6 +78,7 @@ one section per collector, named after that collector:
 | `objects` | Counts of GC-tracked objects grouped by type, top 50 by count |
 | `gc` | Garbage collector state: counts, thresholds and per-generation statistics |
 | `fds` | Open file descriptors, each with its kind, target and (on Linux) socket addresses |
+| `sqlalchemy` | Connection pools the target holds, with size, checked-out count and overflow; `"available": false` when the target never imported SQLAlchemy |
 
 !!! note
 
@@ -101,8 +102,11 @@ schema = snapshot_schema()
 
 ## Collector plugins
 
-A section can come from any installed package, not only from pidprobe. Publish
-an entry point in the `pidprobe.collectors` group:
+A section can come from any installed package, not only from pidprobe --
+including the `sqlalchemy` section above, which pidprobe ships as an ordinary
+plugin. [Writing a collector plugin](plugins.md) walks through that one as a
+worked example; the contract is below. Publish an entry point in the
+`pidprobe.collectors` group:
 
 ```toml
 [project.entry-points."pidprobe.collectors"]
