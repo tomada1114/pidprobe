@@ -8,6 +8,6 @@
 #
 # Floors rather than pins: the demo tracks whatever current release of each
 # package still works on CPython 3.14.
-fastapi>=0.115
+fastapi>=0.141.1
 sqlalchemy>=2.0
 uvicorn>=0.34
