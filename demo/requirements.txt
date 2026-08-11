@@ -10,4 +10,4 @@
 # package still works on CPython 3.14.
 fastapi>=0.115
 sqlalchemy>=2.0
-uvicorn>=0.34
+uvicorn>=0.52.1
